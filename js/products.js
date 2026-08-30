@@ -140,7 +140,7 @@ export const CATALOG = [
     navLabel: "Footwear",
     title: "Artisanal Handcrafted Shoes",
     videoSrc: "Male/male foot wear.mp4",
-    endOffset: 0.5,
+    endOffset: 1.0,
     timelineItems: [
       { start: 0.00, end: 0.20, id: "male-foot-01", title: "Venetian Burnished Oxford Shoes", price: 245, tag: "Italian Calfskin", image: "Male/male footwear details/oxford shoe.png" },
       { start: 0.20, end: 0.40, id: "male-foot-02", title: "Goodyear Welted Brogues", price: 280, tag: "Oak Bark Tanned Sole", image: "Male/male footwear details/goodyear welted brogue.png" },
