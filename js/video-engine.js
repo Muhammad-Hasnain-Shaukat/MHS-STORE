@@ -1,46 +1,68 @@
 // MHS STORE - High-Precision Video Scrubbing Engine (Continuous 60FPS Frame-by-Frame Interpolation)
 
-// Global in-memory video preloader to eliminate network buffering delay across categories
-export class VideoPreloader {
-  static preloaded = new Set();
+// Master In-Memory Video Pool for 0ms Instantaneous Switching
+export class VideoPool {
   static pool = new Map();
 
-  static preloadList(videoSrcs) {
-    if (!Array.isArray(videoSrcs)) return;
+  static warmUp(catalog) {
+    if (!Array.isArray(catalog)) return;
     
-    // Low priority background pre-caching
-    const loadNext = (index) => {
-      if (index >= videoSrcs.length) return;
-      const src = videoSrcs[index];
-      if (!src || this.preloaded.has(src)) {
-        loadNext(index + 1);
-        return;
-      }
+    catalog.forEach(item => {
+      if (!item.videoSrc || this.pool.has(item.videoSrc)) return;
 
       const vid = document.createElement('video');
+      vid.className = 'scrub-video';
       vid.preload = 'auto';
       vid.muted = true;
       vid.playsInline = true;
-      vid.src = src;
-      this.preloaded.add(src);
-      this.pool.set(src, vid);
+      vid.autoplay = false;
+      vid.setAttribute('playsinline', '');
+      vid.setAttribute('webkit-playsinline', '');
+      vid.setAttribute('muted', '');
+      vid.src = item.videoSrc;
 
-      const onReady = () => {
-        vid.removeEventListener('loadeddata', onReady);
-        vid.removeEventListener('error', onReady);
-        setTimeout(() => loadNext(index + 1), 50);
+      const initialTime = Math.max(0.001, item.startOffset || 0);
+
+      const prime = () => {
+        try {
+          vid.currentTime = initialTime;
+        } catch (e) {}
       };
 
-      vid.addEventListener('loadeddata', onReady, { once: true });
-      vid.addEventListener('error', onReady, { once: true });
+      vid.addEventListener('loadedmetadata', prime, { once: true });
+      vid.addEventListener('loadeddata', prime, { once: true });
+      vid.addEventListener('canplay', prime, { once: true });
       vid.load();
-    };
 
-    if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(() => loadNext(0));
-    } else {
-      setTimeout(() => loadNext(0), 100);
+      this.pool.set(item.videoSrc, vid);
+    });
+  }
+
+  static get(videoSrc, startOffset = 0) {
+    let vid = this.pool.get(videoSrc);
+    if (!vid) {
+      vid = document.createElement('video');
+      vid.className = 'scrub-video';
+      vid.preload = 'auto';
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.autoplay = false;
+      vid.setAttribute('playsinline', '');
+      vid.setAttribute('webkit-playsinline', '');
+      vid.setAttribute('muted', '');
+      vid.src = videoSrc;
+      vid.load();
+      this.pool.set(videoSrc, vid);
     }
+
+    const initialTime = Math.max(0.001, startOffset);
+    try {
+      if (Math.abs(vid.currentTime - initialTime) > 0.05) {
+        vid.currentTime = initialTime;
+      }
+    } catch (e) {}
+
+    return vid;
   }
 }
 

@@ -1,6 +1,6 @@
 import { CATALOG, PRODUCTS } from './products.js';
 import { store } from './cart.js';
-import { VideoScrubEngine, VideoPreloader } from './video-engine.js';
+import { VideoScrubEngine, VideoPool } from './video-engine.js';
 import { UIController } from './ui.js';
 import { ProductDetailModal } from './product-detail.js';
 import { RosePetalsEngine } from './rose-petals.js';
@@ -28,8 +28,8 @@ class MhsApp {
     this.rosePetals = new RosePetalsEngine();
     this.kuchuMusic = new KuchuMusicBox();
 
-    // 1. Warm up global video cache in background
-    VideoPreloader.preloadList(CATALOG.map(c => c.videoSrc));
+    // 1. Warm up global video pool in memory for instant 0ms switching
+    VideoPool.warmUp(CATALOG);
 
     // 2. Determine initial page and subcategory
     this.initFromUrl();
@@ -184,21 +184,12 @@ class MhsApp {
     const initialProduct = (this.currentPage !== 'home' && targetItem.timelineItems && targetItem.timelineItems.length) 
       ? targetItem.timelineItems[0] 
       : null;
-    const initialPoster = initialProduct && initialProduct.image ? initialProduct.image : '';
 
     container.innerHTML = `
       <section class="video-scrub-section" id="${targetItem.id}" data-section-id="${targetItem.id}" data-department="${targetItem.department}">
         <div class="video-sticky-viewport">
-          <!-- Pristine Fullscreen Video with Instant Luxury Image Backdrop -->
-          <div class="video-media-wrapper" style="${initialPoster ? `background-image: url('${initialPoster}');` : ''}">
-            <video 
-              class="scrub-video" 
-              playsinline 
-              webkit-playsinline 
-              muted 
-              preload="auto"
-              src="${targetItem.videoSrc}"
-            ></video>
+          <!-- Pristine Fullscreen Video Container -->
+          <div class="video-media-wrapper" id="active-video-wrapper">
             <div class="video-ambient-overlay"></div>
           </div>
 
@@ -240,6 +231,13 @@ class MhsApp {
         </div>
       </section>
     `;
+
+    // Mount the pre-warmed video directly from the VideoPool for instant 0ms playback
+    const wrapper = document.getElementById('active-video-wrapper');
+    if (wrapper) {
+      const videoEl = VideoPool.get(targetItem.videoSrc, targetItem.startOffset);
+      wrapper.insertBefore(videoEl, wrapper.firstChild);
+    }
   }
 
   registerActiveVideo() {
