@@ -138,6 +138,42 @@ export class ProductDetailModal {
     this.initModalDOM();
     this.initFullscreenDOM();
     this.bindGlobalEvents();
+    this.preloadImages();
+  }
+
+  // Pre-fetch all detail images during idle time into browser memory cache
+  preloadImages() {
+    const imagesToPreload = [];
+    PRODUCTS.forEach(p => {
+      if (p.image && p.image.trim() !== '') {
+        imagesToPreload.push(encodeURI(p.image));
+      }
+    });
+
+    const loadNext = (index) => {
+      if (index >= imagesToPreload.length) return;
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = img.onerror = () => {
+        setTimeout(() => loadNext(index + 1), 60);
+      };
+      img.src = imagesToPreload[index];
+    };
+
+    if (typeof window !== 'undefined') {
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(() => loadNext(0), { timeout: 1500 });
+      } else {
+        setTimeout(() => loadNext(0), 400);
+      }
+    }
+  }
+
+  static preloadSingle(imageSrc) {
+    if (!imageSrc || imageSrc.trim() === '') return;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = encodeURI(imageSrc);
   }
 
   initModalDOM() {
@@ -467,7 +503,6 @@ export class ProductDetailModal {
     if (!this.photoStage) return;
 
     if (product.image && product.image.trim() !== '') {
-      // Single Detailed Image given by the user
       const encodedSrc = encodeURI(product.image);
       this.photoStage.innerHTML = `
         <span class="photo-angle-badge" id="photo-angle-badge">
@@ -476,12 +511,36 @@ export class ProductDetailModal {
         <div class="photo-hint-badge">
           <i class="fas fa-expand"></i> Double click for Full Screen
         </div>
-        <img id="detail-main-img" class="detail-main-photo" src="${encodedSrc}" alt="${product.title}" />
+        <div class="detail-photo-shimmer" id="detail-photo-shimmer">
+          <div class="shimmer-spinner"></div>
+        </div>
+        <img 
+          id="detail-main-img" 
+          class="detail-main-photo" 
+          src="${encodedSrc}" 
+          alt="${product.title}"
+          decoding="async"
+          loading="eager"
+        />
       `;
 
       const detailImg = document.getElementById('detail-main-img');
+      const shimmer = document.getElementById('detail-photo-shimmer');
+
       if (detailImg) {
         this.stageZoomCtrl = new TouchZoomController(this.photoStage, detailImg);
+
+        const onImageReady = () => {
+          detailImg.classList.add('loaded');
+          if (shimmer) shimmer.classList.add('hidden');
+        };
+
+        if (detailImg.complete && detailImg.naturalWidth > 0) {
+          onImageReady();
+        } else {
+          detailImg.addEventListener('load', onImageReady, { once: true });
+          detailImg.addEventListener('error', onImageReady, { once: true });
+        }
       }
     } else {
       // Empty Space for Women and Kids (to be added later)

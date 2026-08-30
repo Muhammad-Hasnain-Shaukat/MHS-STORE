@@ -245,6 +245,13 @@ export class VideoScrubEngine {
       if (priceEl) priceEl.textContent = `$${activeItem.price}`;
       if (btnShowMore) btnShowMore.dataset.id = activeItem.id;
       if (btnAdd) btnAdd.dataset.id = activeItem.id;
+
+      // Pre-warm browser cache for the active product detail image
+      if (activeItem.image && activeItem.image.trim() !== '') {
+        const preImg = new Image();
+        preImg.decoding = 'async';
+        preImg.src = encodeURI(activeItem.image);
+      }
     }
   }
 
