@@ -12,14 +12,16 @@ export class VideoScrubEngine {
     this.startLoop();
   }
 
-  registerSection(sectionElement, meta) {
-    const video = sectionElement.querySelector('.scrub-video');
+  registerSection(sectionElement, meta, activeVideoElement) {
+    const video = activeVideoElement || sectionElement.querySelector('.scrub-video.active-slot') || sectionElement.querySelector('.scrub-video');
     const progressBar = sectionElement.querySelector('.minimal-scrub-progress-fill');
     const pill = sectionElement.querySelector('.minimal-add-bag-pill');
 
     if (!video) return;
 
-    video.src = meta.videoSrc;
+    if (!video.src || (!video.src.endsWith(meta.videoSrc) && video.src !== meta.videoSrc)) {
+      video.src = meta.videoSrc;
+    }
     video.muted = true;
     video.playsInline = true;
     video.autoplay = false;
@@ -33,23 +35,42 @@ export class VideoScrubEngine {
     const endOffset = (meta && meta.endOffset) || 0.0;
     const initialTime = Math.max(0.001, startOffset);
 
-    const instanceData = {
-      section: sectionElement,
-      video: video,
-      progressBar: progressBar,
-      pill: pill,
-      meta: meta,
-      startOffset: startOffset,
-      endOffset: endOffset,
-      targetTime: initialTime,
-      currentTime: initialTime,
-      pendingTime: null,
-      duration: 10,
-      isLoaded: false,
-      currentTimelineItem: null,
-      targetProgress: 0,
-      currentProgress: 0
-    };
+    let instanceData = this.instances.get(sectionElement);
+    if (!instanceData) {
+      instanceData = {
+        section: sectionElement,
+        video: video,
+        progressBar: progressBar,
+        pill: pill,
+        meta: meta,
+        startOffset: startOffset,
+        endOffset: endOffset,
+        targetTime: initialTime,
+        currentTime: initialTime,
+        pendingTime: null,
+        duration: (video.duration && video.duration > 0) ? video.duration : 10,
+        isLoaded: video.readyState >= 1,
+        currentTimelineItem: null,
+        targetProgress: 0,
+        currentProgress: 0
+      };
+      this.instances.set(sectionElement, instanceData);
+    } else {
+      instanceData.video = video;
+      instanceData.meta = meta;
+      instanceData.startOffset = startOffset;
+      instanceData.endOffset = endOffset;
+      instanceData.targetTime = initialTime;
+      instanceData.currentTime = initialTime;
+      instanceData.pendingTime = null;
+      instanceData.duration = (video.duration && video.duration > 0) ? video.duration : 10;
+      instanceData.isLoaded = video.readyState >= 1;
+      instanceData.currentTimelineItem = null;
+      instanceData.targetProgress = 0;
+      instanceData.currentProgress = 0;
+      instanceData.progressBar = progressBar;
+      instanceData.pill = pill;
+    }
 
     // Mobile decoder unlock on first touch
     const primeMobile = () => {
@@ -82,7 +103,6 @@ export class VideoScrubEngine {
       }
       instanceData.isLoaded = true;
 
-      // Prime to initial frame
       const initialFrame = Math.max(0.001, instanceData.startOffset);
       try {
         video.currentTime = initialFrame;
@@ -101,8 +121,13 @@ export class VideoScrubEngine {
       video.addEventListener('canplaythrough', onLoaded, { once: true });
     }
 
-    video.load();
-    this.instances.set(sectionElement, instanceData);
+    const initialFrame = Math.max(0.001, startOffset);
+    try {
+      video.currentTime = initialFrame;
+    } catch (e) {}
+
+    this.updateDynamicTimelineItem(instanceData, 0);
+    this.updateScroll();
   }
 
   startLoop() {

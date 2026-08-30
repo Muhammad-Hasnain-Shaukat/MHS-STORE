@@ -28,10 +28,15 @@ class MhsApp {
     this.rosePetals = new RosePetalsEngine();
     this.kuchuMusic = new KuchuMusicBox();
 
+    // Register Service Worker for ultra-fast edge caching and video stream acceleration
+    if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+
     // 1. Determine initial page and subcategory
     this.initFromUrl();
 
-    // 2. Render ONLY the single active animation section
+    // 2. Render ONLY the single active animation section with pre-warmed video matrix
     this.renderActiveSection();
 
     // 3. Render Sub-Category Nav Tabs
@@ -159,20 +164,26 @@ class MhsApp {
     });
   }
 
-  // ================= RENDER ACTIVE SECTION (ONLY 1 MOUNTS IN DOM) =================
+  // ================= RENDER ACTIVE SECTION WITH MULTI-VIDEO DOM MATRIX =================
   renderActiveSection() {
     const container = document.getElementById('video-sections-container');
     if (!container) return;
 
+    let departmentItems = [];
     let targetItem = null;
+
     if (this.currentPage === 'home') {
-      targetItem = CATALOG.find(c => c.department === 'Hero');
+      departmentItems = CATALOG.filter(c => c.department === 'Hero');
+      targetItem = departmentItems[0];
     } else if (this.currentPage === 'men') {
-      targetItem = CATALOG.find(c => c.department === 'Male' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Male');
+      departmentItems = CATALOG.filter(c => c.department === 'Male');
+      targetItem = departmentItems.find(c => c.subCategory === this.activeSubCategory) || departmentItems[0];
     } else if (this.currentPage === 'women') {
-      targetItem = CATALOG.find(c => c.department === 'Female' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Female');
+      departmentItems = CATALOG.filter(c => c.department === 'Female');
+      targetItem = departmentItems.find(c => c.subCategory === this.activeSubCategory) || departmentItems[0];
     } else if (this.currentPage === 'kids') {
-      targetItem = CATALOG.find(c => c.department === 'Kids' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Kids');
+      departmentItems = CATALOG.filter(c => c.department === 'Kids');
+      targetItem = departmentItems.find(c => c.subCategory === this.activeSubCategory) || departmentItems[0];
     }
 
     if (!targetItem) return;
@@ -183,18 +194,22 @@ class MhsApp {
       : null;
 
     container.innerHTML = `
-      <section class="video-scrub-section" id="${targetItem.id}" data-section-id="${targetItem.id}" data-department="${targetItem.department}">
+      <section class="video-scrub-section" id="active-scrub-section" data-section-id="${targetItem.id}" data-department="${targetItem.department}">
         <div class="video-sticky-viewport">
-          <!-- Pristine Fullscreen Video Container -->
+          <!-- Pre-warmed Multi-Video Slot Matrix for 0ms Instant Switching -->
           <div class="video-media-wrapper">
-            <video 
-              class="scrub-video" 
-              playsinline 
-              webkit-playsinline 
-              muted 
-              preload="auto"
-              src="${targetItem.videoSrc}"
-            ></video>
+            ${departmentItems.map(item => `
+              <video 
+                class="scrub-video ${item.subCategory === this.activeSubCategory ? 'active-slot' : 'hidden-slot'}" 
+                id="video-slot-${item.id}"
+                data-id="${item.id}"
+                playsinline 
+                webkit-playsinline 
+                muted 
+                preload="auto"
+                src="${item.videoSrc}"
+              ></video>
+            `).join('')}
             <div class="video-ambient-overlay"></div>
           </div>
 
@@ -242,10 +257,20 @@ class MhsApp {
     const sectionEl = document.querySelector('.video-scrub-section');
     if (!sectionEl) return;
 
-    const id = sectionEl.dataset.sectionId;
-    const meta = CATALOG.find(c => c.id === id);
-    if (meta && this.videoEngine) {
-      this.videoEngine.registerSection(sectionEl, meta);
+    let targetItem = null;
+    if (this.currentPage === 'home') {
+      targetItem = CATALOG.find(c => c.department === 'Hero');
+    } else if (this.currentPage === 'men') {
+      targetItem = CATALOG.find(c => c.department === 'Male' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Male');
+    } else if (this.currentPage === 'women') {
+      targetItem = CATALOG.find(c => c.department === 'Female' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Female');
+    } else if (this.currentPage === 'kids') {
+      targetItem = CATALOG.find(c => c.department === 'Kids' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Kids');
+    }
+
+    if (targetItem && this.videoEngine) {
+      const activeVideo = sectionEl.querySelector(`.scrub-video[data-id="${targetItem.id}"]`) || sectionEl.querySelector('.scrub-video.active-slot') || sectionEl.querySelector('.scrub-video');
+      this.videoEngine.registerSection(sectionEl, targetItem, activeVideo);
     }
   }
 
@@ -285,7 +310,7 @@ class MhsApp {
     });
   }
 
-  // ================= SWITCH SUBCATEGORY (ZERO DELAY INSTANT SWAP) =================
+  // ================= SWITCH SUBCATEGORY (0ms INSTANT SLOT SWAP) =================
   switchSubCategory(subCategory) {
     this.activeSubCategory = subCategory;
 
@@ -296,18 +321,51 @@ class MhsApp {
       });
     }
 
-    // Instant seamless DOM and Video update (no engine destruction)
-    window.scrollTo({ top: 0, behavior: 'instant' });
-    this.renderActiveSection();
-    this.registerActiveVideo();
+    let targetItem = null;
+    if (this.currentPage === 'men') {
+      targetItem = CATALOG.find(c => c.department === 'Male' && c.subCategory === subCategory);
+    } else if (this.currentPage === 'women') {
+      targetItem = CATALOG.find(c => c.department === 'Female' && c.subCategory === subCategory);
+    } else if (this.currentPage === 'kids') {
+      targetItem = CATALOG.find(c => c.department === 'Kids' && c.subCategory === subCategory);
+    }
+
+    const sectionEl = document.querySelector('.video-scrub-section');
+    if (sectionEl && targetItem) {
+      // 0ms Instant Slot Visibility Switch (No DOM recreation, No network pause)
+      sectionEl.querySelectorAll('.scrub-video').forEach(vid => {
+        const isActive = (vid.dataset.id === targetItem.id);
+        vid.classList.toggle('active-slot', isActive);
+        vid.classList.toggle('hidden-slot', !isActive);
+      });
+
+      // Update Pill Info to First Product of new subcategory
+      const pill = sectionEl.querySelector('.minimal-add-bag-pill');
+      if (pill && targetItem.timelineItems && targetItem.timelineItems.length) {
+        const firstProd = targetItem.timelineItems[0];
+        const tagEl = pill.querySelector('.pill-tag');
+        const titleEl = pill.querySelector('.pill-title');
+        const priceEl = pill.querySelector('.pill-price');
+        const btnShowMore = pill.querySelector('.btn-pill-show-more');
+        if (tagEl) tagEl.textContent = firstProd.tag || '';
+        if (titleEl) titleEl.textContent = firstProd.title;
+        if (priceEl) priceEl.textContent = `$${firstProd.price}`;
+        if (btnShowMore) btnShowMore.dataset.id = firstProd.id;
+      }
+
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      this.registerActiveVideo();
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      this.renderActiveSection();
+      this.registerActiveVideo();
+    }
 
     const pagePath = this.currentPage === 'home' ? 'index.html' : `${this.currentPage}.html`;
     const newUrl = `${pagePath}?sub=${subCategory}`;
     window.history.replaceState({ page: this.currentPage, sub: subCategory }, '', newUrl);
 
-    // Trigger Kuchu Puchu Special effects (Rose petals + sweet rhyme)
     this.checkKuchuSpecialEffects();
-
     this.ui.playAudio('swoosh');
   }
 
@@ -381,10 +439,39 @@ class MhsApp {
     }
   }
 
-  // ================= SCROLL LISTENER =================
+  // ================= SCROLL LISTENER & LENIS INERTIA MOMENTUM =================
   setupScrollListener() {
-    let ticking = false;
+    if (typeof Lenis !== 'undefined') {
+      try {
+        const lenis = new Lenis({
+          duration: 1.1,
+          easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+          orientation: 'vertical',
+          gestureOrientation: 'vertical',
+          smoothWheel: true,
+          wheelMultiplier: 0.95,
+          touchMultiplier: 1.4,
+          infinite: false
+        });
 
+        function raf(time) {
+          lenis.raf(time);
+          requestAnimationFrame(raf);
+        }
+        requestAnimationFrame(raf);
+
+        lenis.on('scroll', () => {
+          if (this.videoEngine) {
+            this.videoEngine.updateScroll();
+          }
+        });
+        window.lenisInstance = lenis;
+      } catch (e) {
+        console.warn('Lenis init fallback:', e);
+      }
+    }
+
+    let ticking = false;
     const onScrollUpdate = () => {
       if (!ticking) {
         requestAnimationFrame(() => {
