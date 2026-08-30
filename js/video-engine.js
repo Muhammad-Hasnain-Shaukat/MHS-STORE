@@ -88,19 +88,6 @@ export class VideoScrubEngine {
     };
     window.addEventListener('touchstart', primeMobile, { once: true, passive: true });
 
-    // Handle seeked event to ensure every intermediate frame is rendered seamlessly
-    video.addEventListener('seeked', () => {
-      if (instanceData.pendingTime !== null) {
-        const next = instanceData.pendingTime;
-        instanceData.pendingTime = null;
-        if (Math.abs(video.currentTime - next) > 0.005) {
-          try {
-            video.currentTime = next;
-          } catch (e) {}
-        }
-      }
-    });
-
     const onLoaded = () => {
       if (video.duration && !isNaN(video.duration) && video.duration > 0) {
         instanceData.duration = video.duration;
@@ -174,6 +161,8 @@ export class VideoScrubEngine {
 
   render() {
     for (const [sectionEl, data] of this.instances.entries()) {
+      if (!data.video) continue;
+
       if (!data.isLoaded) {
         if (data.video.readyState >= 1) {
           if (data.video.duration && !isNaN(data.video.duration) && data.video.duration > 0) {
@@ -185,39 +174,33 @@ export class VideoScrubEngine {
         }
       }
 
-      // Smooth Lerp Interpolation
-      const timeDiff = data.targetTime - data.currentTime;
+      // Smooth Progress Bar Lerp
       const progDiff = data.targetProgress - data.currentProgress;
-      const targetSafe = Math.max(0.001, Math.min(data.duration - 0.001, data.targetTime));
-
-      // Continuously interpolate until both currentTime and video.currentTime reach target
-      if (Math.abs(timeDiff) > this.epsilon || Math.abs(data.video.currentTime - targetSafe) > 0.01) {
-        if (Math.abs(timeDiff) > this.epsilon) {
-          data.currentTime += timeDiff * this.lerpFactor;
-        } else {
-          data.currentTime = data.targetTime;
-        }
-
-        // Apply precision frame timestamp to video
-        const safeTime = Math.max(0.001, Math.min(data.duration - 0.001, data.currentTime));
-        if (!data.video.seeking) {
-          try {
-            data.video.currentTime = safeTime;
-          } catch (e) {}
-        } else {
-          data.pendingTime = safeTime;
-        }
-      }
-
-      if (Math.abs(progDiff) > this.epsilon) {
+      if (Math.abs(progDiff) > 0.0001) {
         data.currentProgress += progDiff * this.lerpFactor;
       } else {
         data.currentProgress = data.targetProgress;
       }
 
-      // Update 3px Progress Line
       if (data.progressBar) {
         data.progressBar.style.transform = `scaleX(${data.currentProgress})`;
+      }
+
+      // Smooth Time Lerp
+      const timeDiff = data.targetTime - data.currentTime;
+      if (Math.abs(timeDiff) > this.epsilon) {
+        data.currentTime += timeDiff * this.lerpFactor;
+      } else {
+        data.currentTime = data.targetTime;
+      }
+
+      const safeTime = Math.max(0.001, Math.min(data.duration - 0.001, data.currentTime));
+
+      // Seek video frame smoothly
+      if (Math.abs(data.video.currentTime - safeTime) > 0.005) {
+        try {
+          data.video.currentTime = safeTime;
+        } catch (e) {}
       }
 
       // Real-Time Dynamic Timeline Item and Price Swapping
