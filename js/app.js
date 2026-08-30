@@ -59,27 +59,29 @@ class MhsApp {
   }
 
   // ================= URL / STATE RESOLVER =================
+  resolvePageFromUrl(url) {
+    const clean = (url || '').toLowerCase();
+    // CRITICAL: Check 'women' before 'men' because 'women' contains 'men'!
+    if (clean.includes('women')) return 'women';
+    if (clean.includes('kids')) return 'kids';
+    if (clean.includes('men')) return 'men';
+    return 'home';
+  }
+
   initFromUrl() {
-    const pathname = window.location.pathname.toLowerCase();
+    const page = this.resolvePageFromUrl(window.location.pathname);
     const urlParams = new URLSearchParams(window.location.search);
     const subParam = urlParams.get('sub');
 
-    if (pathname.includes('men')) {
-      this.currentPage = 'men';
+    this.currentPage = page;
+    if (this.currentPage === 'men') {
       this.activeSubCategory = subParam || 'watches';
-    } else if (pathname.includes('women')) {
-      this.currentPage = 'women';
+    } else if (this.currentPage === 'women') {
       this.activeSubCategory = subParam || 'wedding';
-    } else if (pathname.includes('kids')) {
-      this.currentPage = 'kids';
+    } else if (this.currentPage === 'kids') {
       this.activeSubCategory = subParam || 'babyfootwear';
     } else {
-      if (document.body.dataset.page && document.body.dataset.page !== 'home') {
-        this.currentPage = document.body.dataset.page;
-      } else {
-        this.currentPage = 'home';
-      }
-      this.activeSubCategory = subParam || (this.currentPage === 'men' ? 'watches' : this.currentPage === 'women' ? 'wedding' : this.currentPage === 'kids' ? 'babyfootwear' : 'title');
+      this.activeSubCategory = 'title';
     }
 
     document.body.dataset.page = this.currentPage;
@@ -111,20 +113,16 @@ class MhsApp {
   }
 
   navigateSpa(targetUrl) {
-    let targetPage = 'home';
+    const targetPage = this.resolvePageFromUrl(targetUrl);
     let targetSub = null;
 
-    if (targetUrl.includes('men')) {
-      targetPage = 'men';
+    if (targetPage === 'men') {
       targetSub = 'watches';
-    } else if (targetUrl.includes('women')) {
-      targetPage = 'women';
+    } else if (targetPage === 'women') {
       targetSub = 'wedding';
-    } else if (targetUrl.includes('kids')) {
-      targetPage = 'kids';
+    } else if (targetPage === 'kids') {
       targetSub = 'babyfootwear';
     } else {
-      targetPage = 'home';
       targetSub = 'title';
     }
 
@@ -159,12 +157,8 @@ class MhsApp {
   updateHeaderActiveState() {
     document.querySelectorAll('.header-dept-nav .dept-nav-btn').forEach(btn => {
       const href = btn.getAttribute('href') || '';
-      const isHome = this.currentPage === 'home' && href.includes('index.html');
-      const isMen = this.currentPage === 'men' && href.includes('men.html');
-      const isWomen = this.currentPage === 'women' && href.includes('women.html');
-      const isKids = this.currentPage === 'kids' && href.includes('kids.html');
-
-      btn.classList.toggle('active', isHome || isMen || isWomen || isKids);
+      const page = this.resolvePageFromUrl(href);
+      btn.classList.toggle('active', page === this.currentPage);
     });
   }
 
@@ -190,12 +184,13 @@ class MhsApp {
     const initialProduct = (this.currentPage !== 'home' && targetItem.timelineItems && targetItem.timelineItems.length) 
       ? targetItem.timelineItems[0] 
       : null;
+    const initialPoster = initialProduct && initialProduct.image ? initialProduct.image : '';
 
     container.innerHTML = `
       <section class="video-scrub-section" id="${targetItem.id}" data-section-id="${targetItem.id}" data-department="${targetItem.department}">
         <div class="video-sticky-viewport">
-          <!-- Pristine Fullscreen Video -->
-          <div class="video-media-wrapper">
+          <!-- Pristine Fullscreen Video with Instant Luxury Image Backdrop -->
+          <div class="video-media-wrapper" style="${initialPoster ? `background-image: url('${initialPoster}');` : ''}">
             <video 
               class="scrub-video" 
               playsinline 
@@ -204,6 +199,7 @@ class MhsApp {
               preload="auto"
               src="${targetItem.videoSrc}"
             ></video>
+            <div class="video-ambient-overlay"></div>
           </div>
 
           <!-- Minimal Scroll Cue (Hero only) -->

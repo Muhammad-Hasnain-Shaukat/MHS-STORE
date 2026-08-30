@@ -131,6 +131,7 @@ export class VideoScrubEngine {
 
     // Handle seeked event to ensure every intermediate frame is rendered seamlessly
     video.addEventListener('seeked', () => {
+      video.classList.add('video-ready');
       if (instanceData.pendingTime !== null) {
         const next = instanceData.pendingTime;
         instanceData.pendingTime = null;
@@ -154,6 +155,7 @@ export class VideoScrubEngine {
         video.currentTime = initialFrame;
       } catch (e) {}
 
+      video.classList.add('video-ready');
       this.updateDynamicTimelineItem(instanceData, 0);
       this.updateScroll();
     };
