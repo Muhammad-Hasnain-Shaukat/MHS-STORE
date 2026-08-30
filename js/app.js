@@ -164,29 +164,30 @@ class MhsApp {
     });
   }
 
-  // ================= RENDER ACTIVE SECTION WITH MULTI-VIDEO DOM MATRIX =================
+  // ================= RENDER ACTIVE SECTION WITH UNIVERSAL MASTER VIDEO MATRIX =================
   renderActiveSection() {
     const container = document.getElementById('video-sections-container');
     if (!container) return;
 
-    let departmentItems = [];
     let targetItem = null;
-
     if (this.currentPage === 'home') {
-      departmentItems = CATALOG.filter(c => c.department === 'Hero');
-      targetItem = departmentItems[0];
+      targetItem = CATALOG.find(c => c.department === 'Hero');
     } else if (this.currentPage === 'men') {
-      departmentItems = CATALOG.filter(c => c.department === 'Male');
-      targetItem = departmentItems.find(c => c.subCategory === this.activeSubCategory) || departmentItems[0];
+      targetItem = CATALOG.find(c => c.department === 'Male' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Male');
     } else if (this.currentPage === 'women') {
-      departmentItems = CATALOG.filter(c => c.department === 'Female');
-      targetItem = departmentItems.find(c => c.subCategory === this.activeSubCategory) || departmentItems[0];
+      targetItem = CATALOG.find(c => c.department === 'Female' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Female');
     } else if (this.currentPage === 'kids') {
-      departmentItems = CATALOG.filter(c => c.department === 'Kids');
-      targetItem = departmentItems.find(c => c.subCategory === this.activeSubCategory) || departmentItems[0];
+      targetItem = CATALOG.find(c => c.department === 'Kids' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Kids');
     }
 
     if (!targetItem) return;
+
+    // Check if section already exists in DOM - if so, simply update slots in 0ms!
+    const sectionEl = container.querySelector('.video-scrub-section');
+    if (sectionEl) {
+      this.updateActiveSlotAndPill(targetItem);
+      return;
+    }
 
     // Only render Add to Bag pill on department category pages (not on homepage)
     const initialProduct = (this.currentPage !== 'home' && targetItem.timelineItems && targetItem.timelineItems.length) 
@@ -196,11 +197,11 @@ class MhsApp {
     container.innerHTML = `
       <section class="video-scrub-section" id="active-scrub-section" data-section-id="${targetItem.id}" data-department="${targetItem.department}">
         <div class="video-sticky-viewport">
-          <!-- Pre-warmed Multi-Video Slot Matrix for 0ms Instant Switching -->
-          <div class="video-media-wrapper">
-            ${departmentItems.map(item => `
+          <!-- Universal Master Video Slot Matrix for 0ms Instant Global Switching -->
+          <div class="video-media-wrapper" id="video-media-wrapper">
+            ${CATALOG.map(item => `
               <video 
-                class="scrub-video ${item.subCategory === this.activeSubCategory ? 'active-slot' : 'hidden-slot'}" 
+                class="scrub-video ${item.id === targetItem.id ? 'active-slot' : 'hidden-slot'}" 
                 id="video-slot-${item.id}"
                 data-id="${item.id}"
                 playsinline 
@@ -214,35 +215,29 @@ class MhsApp {
           </div>
 
           <!-- Minimal Scroll Cue (Hero only) -->
-          ${this.currentPage === 'home' ? `
-            <div class="minimal-scroll-cue">
-              <span>Scroll to scrub</span>
-              <div class="cue-arrow"></div>
-            </div>
-          ` : ''}
+          <div class="minimal-scroll-cue ${this.currentPage === 'home' ? '' : 'hidden-cue'}">
+            <span>Scroll to scrub</span>
+            <div class="cue-arrow"></div>
+          </div>
 
-          <!-- Floating Interactive Plus Button & Expandable Product Pill (Hidden at first) -->
-          ${initialProduct ? `
-            <div class="interactive-pill-container" id="interactive-pill-container">
-              <!-- Expandable Pill (Collapsed by default) -->
-              <div class="minimal-add-bag-pill collapsed" id="dynamic-product-pill">
-                <div class="pill-info" data-action="show-more" data-id="${initialProduct.id}" style="cursor:pointer;">
-                  <span class="pill-tag">${initialProduct.tag || ''}</span>
-                  <span class="pill-title">${initialProduct.title}</span>
-                  <span class="pill-price">$${initialProduct.price}</span>
-                </div>
-                <button class="btn-pill-show-more" data-action="show-more" data-id="${initialProduct.id}">
-                  <i class="fas fa-eye"></i> Show More
-                </button>
+          <!-- Floating Interactive Plus Button & Expandable Product Pill -->
+          <div class="interactive-pill-container ${initialProduct ? '' : 'hidden-pill'}" id="interactive-pill-container">
+            <div class="minimal-add-bag-pill collapsed" id="dynamic-product-pill">
+              <div class="pill-info" data-action="show-more" data-id="${initialProduct ? initialProduct.id : ''}" style="cursor:pointer;">
+                <span class="pill-tag">${initialProduct ? (initialProduct.tag || '') : ''}</span>
+                <span class="pill-title">${initialProduct ? initialProduct.title : ''}</span>
+                <span class="pill-price">${initialProduct ? `$${initialProduct.price}` : ''}</span>
               </div>
-
-              <!-- Floating Luxury Plus Toggle Button -->
-              <button class="btn-pill-toggle" id="btn-pill-toggle" title="View Item Details" aria-label="Toggle Details">
-                <i class="fas fa-plus icon-plus"></i>
-                <i class="fas fa-times icon-close"></i>
+              <button class="btn-pill-show-more" data-action="show-more" data-id="${initialProduct ? initialProduct.id : ''}">
+                <i class="fas fa-eye"></i> Show More
               </button>
             </div>
-          ` : ''}
+
+            <button class="btn-pill-toggle" id="btn-pill-toggle" title="View Item Details" aria-label="Toggle Details">
+              <i class="fas fa-plus icon-plus"></i>
+              <i class="fas fa-times icon-close"></i>
+            </button>
+          </div>
 
           <!-- Minimal 3px Bottom Progress Line -->
           <div class="minimal-scrub-progress-track">
@@ -251,6 +246,48 @@ class MhsApp {
         </div>
       </section>
     `;
+  }
+
+  updateActiveSlotAndPill(targetItem) {
+    const sectionEl = document.querySelector('.video-scrub-section');
+    if (!sectionEl || !targetItem) return;
+
+    sectionEl.dataset.sectionId = targetItem.id;
+    sectionEl.dataset.department = targetItem.department;
+
+    // 0ms Instant Slot Swap across all videos
+    sectionEl.querySelectorAll('.scrub-video').forEach(vid => {
+      const isActive = (vid.dataset.id === targetItem.id);
+      vid.classList.toggle('active-slot', isActive);
+      vid.classList.toggle('hidden-slot', !isActive);
+    });
+
+    // Cue Visibility
+    const cueEl = sectionEl.querySelector('.minimal-scroll-cue');
+    if (cueEl) {
+      cueEl.classList.toggle('hidden-cue', this.currentPage !== 'home');
+    }
+
+    // Pill Container Visibility & Data
+    const pillContainer = sectionEl.querySelector('.interactive-pill-container');
+    const hasProducts = (this.currentPage !== 'home' && targetItem.timelineItems && targetItem.timelineItems.length > 0);
+    if (pillContainer) {
+      pillContainer.classList.toggle('hidden-pill', !hasProducts);
+      if (hasProducts) {
+        const firstProd = targetItem.timelineItems[0];
+        const tagEl = pillContainer.querySelector('.pill-tag');
+        const titleEl = pillContainer.querySelector('.pill-title');
+        const priceEl = pillContainer.querySelector('.pill-price');
+        const btnShowMore = pillContainer.querySelector('.btn-pill-show-more');
+        const pillInfo = pillContainer.querySelector('.pill-info');
+
+        if (tagEl) tagEl.textContent = firstProd.tag || '';
+        if (titleEl) titleEl.textContent = firstProd.title;
+        if (priceEl) priceEl.textContent = `$${firstProd.price}`;
+        if (btnShowMore) btnShowMore.dataset.id = firstProd.id;
+        if (pillInfo) pillInfo.dataset.id = firstProd.id;
+      }
+    }
   }
 
   registerActiveVideo() {
@@ -330,36 +367,9 @@ class MhsApp {
       targetItem = CATALOG.find(c => c.department === 'Kids' && c.subCategory === subCategory);
     }
 
-    const sectionEl = document.querySelector('.video-scrub-section');
-    if (sectionEl && targetItem) {
-      // 0ms Instant Slot Visibility Switch (No DOM recreation, No network pause)
-      sectionEl.querySelectorAll('.scrub-video').forEach(vid => {
-        const isActive = (vid.dataset.id === targetItem.id);
-        vid.classList.toggle('active-slot', isActive);
-        vid.classList.toggle('hidden-slot', !isActive);
-      });
-
-      // Update Pill Info to First Product of new subcategory
-      const pill = sectionEl.querySelector('.minimal-add-bag-pill');
-      if (pill && targetItem.timelineItems && targetItem.timelineItems.length) {
-        const firstProd = targetItem.timelineItems[0];
-        const tagEl = pill.querySelector('.pill-tag');
-        const titleEl = pill.querySelector('.pill-title');
-        const priceEl = pill.querySelector('.pill-price');
-        const btnShowMore = pill.querySelector('.btn-pill-show-more');
-        if (tagEl) tagEl.textContent = firstProd.tag || '';
-        if (titleEl) titleEl.textContent = firstProd.title;
-        if (priceEl) priceEl.textContent = `$${firstProd.price}`;
-        if (btnShowMore) btnShowMore.dataset.id = firstProd.id;
-      }
-
-      window.scrollTo({ top: 0, behavior: 'instant' });
-      this.registerActiveVideo();
-    } else {
-      window.scrollTo({ top: 0, behavior: 'instant' });
-      this.renderActiveSection();
-      this.registerActiveVideo();
-    }
+    this.updateActiveSlotAndPill(targetItem);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    this.registerActiveVideo();
 
     const pagePath = this.currentPage === 'home' ? 'index.html' : `${this.currentPage}.html`;
     const newUrl = `${pagePath}?sub=${subCategory}`;
@@ -439,38 +449,8 @@ class MhsApp {
     }
   }
 
-  // ================= SCROLL LISTENER & LENIS INERTIA MOMENTUM =================
+  // ================= 60FPS HARDWARE-ACCELERATED SCROLL LISTENER =================
   setupScrollListener() {
-    if (typeof Lenis !== 'undefined') {
-      try {
-        const lenis = new Lenis({
-          duration: 1.1,
-          easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-          orientation: 'vertical',
-          gestureOrientation: 'vertical',
-          smoothWheel: true,
-          wheelMultiplier: 0.95,
-          touchMultiplier: 1.4,
-          infinite: false
-        });
-
-        function raf(time) {
-          lenis.raf(time);
-          requestAnimationFrame(raf);
-        }
-        requestAnimationFrame(raf);
-
-        lenis.on('scroll', () => {
-          if (this.videoEngine) {
-            this.videoEngine.updateScroll();
-          }
-        });
-        window.lenisInstance = lenis;
-      } catch (e) {
-        console.warn('Lenis init fallback:', e);
-      }
-    }
-
     let ticking = false;
     const onScrollUpdate = () => {
       if (!ticking) {

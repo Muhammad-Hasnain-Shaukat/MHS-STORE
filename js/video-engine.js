@@ -5,8 +5,8 @@ export class VideoScrubEngine {
     this.rafId = null;
     this.isDestroyed = false;
 
-    // Smooth interpolation factor (0.22 for silky 60fps continuous frame progression)
-    this.lerpFactor = 0.22;
+    // Smooth interpolation factor (0.35 for crisp, immediate 60fps continuous frame progression)
+    this.lerpFactor = 0.35;
     this.epsilon = 0.0005;
 
     this.startLoop();

@@ -91,6 +91,10 @@
   pointer-events: auto;
 }
 
+.hidden-cue, .hidden-pill {
+  display: none !important;
+}
+
 /* Luxury Circular Plus Button */
 .btn-pill-toggle {
   width: 44px;
