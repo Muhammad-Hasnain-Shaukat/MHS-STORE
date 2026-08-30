@@ -1,0 +1,23 @@
+# OS Metadata
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Node / Dependencies
+node_modules/
+
+# IDE & Agent scratch files
+.vscode/
+.idea/
+.system_generated/
+.agents/
+scratch/

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MHS STORE — Men's Sartorial Collection</title>
+  <meta name="description" content="Scroll-driven frame animation showcase for Men's Luxury Watches, Tuxedos, Casuals, Footwear, Accessories, and Wedding Wear." />
+  <meta name="theme-color" content="#000000" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/video-scrub.css" />
+  <link rel="stylesheet" href="css/product-detail.css" />
+  <link rel="stylesheet" href="css/ecom.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+</head>
+<body data-page="men">
+
+  <!-- ================= CLEAN 48PX TOP TITLE BAR (HOMEPAGE LOOK) ================= -->
+  <header class="site-header" id="site-header">
+    <div class="header-top-row">
+      <!-- Left: Logo -->
+      <a href="index.html" class="brand-logo-wrap" title="MHS STORE">
+        <img src="assets/mhs-logo.jpg" alt="MHS" class="brand-logo-img" />
+        <span class="brand-name-white">STORE</span>
+      </a>
+
+      <!-- Center: Department Nav Links -->
+      <nav class="header-dept-nav" aria-label="Department Navigation">
+        <a href="index.html" class="dept-nav-btn">Universe</a>
+        <a href="men.html" class="dept-nav-btn active">Men</a>
+        <a href="women.html" class="dept-nav-btn">Women</a>
+        <a href="kids.html" class="dept-nav-btn"><span class="nav-text-full">Kids & Toys</span><span class="nav-text-short">Kids</span></a>
+      </nav>
+
+      <!-- Right: Minimal Bag & Account Action Buttons -->
+      <div class="header-actions">
+        <button class="btn-header-action" id="btn-header-account" title="Account / Sign In">
+          <i class="fas fa-user-circle"></i>
+          <span id="header-user-name">Sign In</span>
+        </button>
+        <button class="btn-header-action" id="btn-header-cart" title="Shopping Bag">
+          <i class="fas fa-shopping-bag"></i>
+          <span>Bag</span>
+          <span class="header-badge cart-count-badge">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= LEFT-SIDE VERTICAL SUB-CATEGORY COLUMN DOCK ================= -->
+  <nav class="left-vertical-subnav" id="subnav-dock" aria-label="Men's Sub-Category Navigation">
+    <!-- Sub-category chips populated by app.js (Watches, Formal, Casual, Footwear, etc.) -->
+  </nav>
+
+  <!-- ================= SINGLE SELECTED MEN'S VIDEO SCRUBBING ================= -->
+  <main id="main-content">
+    <div id="video-sections-container">
+      <!-- Active Video Scrub Section Mounted Here by app.js -->
+    </div>
+  </main>
+
+  <!-- ================= SLIM LUXURY FOOTER ================= -->
+  <footer class="site-footer">
+    <div class="site-footer-content">
+      <span>&copy; 2026 MHS STORE. All Rights Reserved.</span>
+      <button type="button" class="btn-admin-diamond" id="btn-admin-access" title="MHS Atelier Admin Portal">
+        <i class="fas fa-gem"></i>
+      </button>
+    </div>
+  </footer>
+
+  <!-- ================= DRAWERS & MODALS ================= -->
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <div class="modal-backdrop" id="modal-backdrop"></div>
+
+  <!-- Cart Drawer -->
+  <div class="mhs-drawer" id="cart-drawer" aria-labelledby="cart-title">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <i class="fas fa-shopping-bag text-gold"></i>
+        <h3 class="drawer-title" id="cart-title">Shopping Bag</h3>
+      </div>
+      <button class="btn-drawer-close" onclick="window.mhsApp.ui.closeAllDrawers()" title="Close Bag">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="free-shipping-tracker">
+      <div class="shipping-msg" id="free-shipping-msg">Add <strong>$150.00</strong> more for Free Global Shipping!</div>
+      <div class="shipping-progress-track">
+        <div class="shipping-progress-fill" id="free-shipping-progress-fill" style="width: 0%;"></div>
+      </div>
+    </div>
+    <div class="drawer-body" id="cart-items-list"></div>
+    <div class="drawer-empty-state" id="cart-empty-state">
+      <i class="fas fa-shopping-bag"></i>
+      <h4>Your Luxury Bag is Empty</h4>
+      <p>Scroll through any category and tap <strong>Add to Bag</strong> to acquire bespoke creations.</p>
+    </div>
+    <div class="drawer-footer" id="cart-drawer-footer" style="display: none;">
+      <form id="cart-coupon-form" class="coupon-form">
+        <input type="text" name="coupon" placeholder="Promo code (e.g. MHSVIP)" />
+        <button type="submit">Apply</button>
+      </form>
+      <div class="cart-summary-breakdown">
+        <div class="summary-row">
+          <span>Subtotal</span>
+          <span id="cart-subtotal-val">$0.00</span>
+        </div>
+        <div class="summary-row" id="cart-discount-row" style="display: none; color: var(--emerald-accent);">
+          <span>VIP Discount</span>
+          <span id="cart-discount-val">-$0.00</span>
+        </div>
+        <div class="summary-row">
+          <span>Shipping (Express)</span>
+          <span id="cart-shipping-val">FREE</span>
+        </div>
+        <div class="summary-row">
+          <span>Estimated Tax</span>
+          <span id="cart-tax-val">$0.00</span>
+        </div>
+        <div class="summary-row total-row">
+          <span>Estimated Total</span>
+          <span class="total-val" id="cart-total-val">$0.00</span>
+        </div>
+      </div>
+      <button class="btn-primary-glow btn-drawer-checkout" id="btn-cart-checkout">
+        <i class="fas fa-lock"></i> Proceed to Checkout
+      </button>
+    </div>
+  </div>
+
+  <div class="mhs-modal" id="auth-modal" role="dialog" aria-modal="true"></div>
+  <div class="mhs-modal" id="quickview-modal" role="dialog" aria-modal="true"></div>
+  <div class="mhs-modal" id="checkout-modal" role="dialog" aria-modal="true"></div>
+  <div class="toast-container" id="toast-container"></div>
+  <div class="fly-particle-layer" id="fly-particle-layer"></div>
+
+  <!-- Main JavaScript App Entrypoint (ES Module) -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
