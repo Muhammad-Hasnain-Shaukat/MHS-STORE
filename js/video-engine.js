@@ -1,4 +1,49 @@
 // MHS STORE - High-Precision Video Scrubbing Engine (Continuous 60FPS Frame-by-Frame Interpolation)
+
+// Global in-memory video preloader to eliminate network buffering delay across categories
+export class VideoPreloader {
+  static preloaded = new Set();
+  static pool = new Map();
+
+  static preloadList(videoSrcs) {
+    if (!Array.isArray(videoSrcs)) return;
+    
+    // Low priority background pre-caching
+    const loadNext = (index) => {
+      if (index >= videoSrcs.length) return;
+      const src = videoSrcs[index];
+      if (!src || this.preloaded.has(src)) {
+        loadNext(index + 1);
+        return;
+      }
+
+      const vid = document.createElement('video');
+      vid.preload = 'auto';
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.src = src;
+      this.preloaded.add(src);
+      this.pool.set(src, vid);
+
+      const onReady = () => {
+        vid.removeEventListener('loadeddata', onReady);
+        vid.removeEventListener('error', onReady);
+        setTimeout(() => loadNext(index + 1), 50);
+      };
+
+      vid.addEventListener('loadeddata', onReady, { once: true });
+      vid.addEventListener('error', onReady, { once: true });
+      vid.load();
+    };
+
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => loadNext(0));
+    } else {
+      setTimeout(() => loadNext(0), 100);
+    }
+  }
+}
+
 export class VideoScrubEngine {
   constructor() {
     this.instances = new Map();
@@ -19,7 +64,46 @@ export class VideoScrubEngine {
 
     if (!video) return;
 
-    video.src = meta.videoSrc;
+    // Check if we already have an instance for this section
+    let instanceData = this.instances.get(sectionElement);
+    const startOffset = (meta && meta.startOffset) || 0.0;
+    const endOffset = (meta && meta.endOffset) || 0.0;
+    const initialTime = Math.max(0.001, startOffset);
+
+    if (!instanceData) {
+      instanceData = {
+        section: sectionElement,
+        video: video,
+        progressBar: progressBar,
+        pill: pill,
+        meta: meta,
+        startOffset: startOffset,
+        endOffset: endOffset,
+        targetTime: initialTime,
+        currentTime: initialTime,
+        pendingTime: null,
+        duration: 10,
+        isLoaded: false,
+        currentTimelineItem: null,
+        targetProgress: 0,
+        currentProgress: 0
+      };
+      this.instances.set(sectionElement, instanceData);
+    } else {
+      instanceData.meta = meta;
+      instanceData.startOffset = startOffset;
+      instanceData.endOffset = endOffset;
+      instanceData.targetTime = initialTime;
+      instanceData.currentTime = initialTime;
+      instanceData.pendingTime = null;
+      instanceData.isLoaded = false;
+      instanceData.currentTimelineItem = null;
+      instanceData.targetProgress = 0;
+      instanceData.currentProgress = 0;
+      instanceData.progressBar = progressBar;
+      instanceData.pill = pill;
+    }
+
     video.muted = true;
     video.playsInline = true;
     video.autoplay = false;
@@ -27,29 +111,11 @@ export class VideoScrubEngine {
     video.setAttribute('playsinline', '');
     video.setAttribute('webkit-playsinline', '');
     video.setAttribute('muted', '');
+    
+    if (video.src !== meta.videoSrc && !video.src.endsWith(meta.videoSrc)) {
+      video.src = meta.videoSrc;
+    }
     video.pause();
-
-    const startOffset = (meta && meta.startOffset) || 0.0;
-    const endOffset = (meta && meta.endOffset) || 0.0;
-    const initialTime = Math.max(0.001, startOffset);
-
-    const instanceData = {
-      section: sectionElement,
-      video: video,
-      progressBar: progressBar,
-      pill: pill,
-      meta: meta,
-      startOffset: startOffset,
-      endOffset: endOffset,
-      targetTime: initialTime,
-      currentTime: initialTime,
-      pendingTime: null,
-      duration: 10,
-      isLoaded: false,
-      currentTimelineItem: null,
-      targetProgress: 0,
-      currentProgress: 0
-    };
 
     // Mobile decoder unlock on first touch
     const primeMobile = () => {
@@ -82,7 +148,7 @@ export class VideoScrubEngine {
       }
       instanceData.isLoaded = true;
 
-      // Prime to initial frame
+      // Prime to initial frame immediately
       const initialFrame = Math.max(0.001, instanceData.startOffset);
       try {
         video.currentTime = initialFrame;
@@ -92,7 +158,7 @@ export class VideoScrubEngine {
       this.updateScroll();
     };
 
-    if (video.readyState >= 1) {
+    if (video.readyState >= 2) {
       onLoaded();
     } else {
       video.addEventListener('loadedmetadata', onLoaded, { once: true });
@@ -102,7 +168,6 @@ export class VideoScrubEngine {
     }
 
     video.load();
-    this.instances.set(sectionElement, instanceData);
   }
 
   startLoop() {

@@ -1,6 +1,6 @@
 import { CATALOG, PRODUCTS } from './products.js';
 import { store } from './cart.js';
-import { VideoScrubEngine } from './video-engine.js';
+import { VideoScrubEngine, VideoPreloader } from './video-engine.js';
 import { UIController } from './ui.js';
 import { ProductDetailModal } from './product-detail.js';
 import { RosePetalsEngine } from './rose-petals.js';
@@ -28,46 +28,144 @@ class MhsApp {
     this.rosePetals = new RosePetalsEngine();
     this.kuchuMusic = new KuchuMusicBox();
 
-    // 1. Determine initial subcategory for department pages
-    this.initActiveSubCategory();
+    // 1. Warm up global video cache in background
+    VideoPreloader.preloadList(CATALOG.map(c => c.videoSrc));
 
-    // 2. Render ONLY the single active animation section
+    // 2. Determine initial page and subcategory
+    this.initFromUrl();
+
+    // 3. Render ONLY the single active animation section
     this.renderActiveSection();
 
-    // 3. Render Sub-Category Nav Tabs
+    // 4. Render Sub-Category Nav Tabs
     this.renderSubnavTabs();
 
-    // 4. Initialize Video Scrubbing Engine
+    // 5. Initialize Video Scrubbing Engine (singleton instance)
     this.videoEngine = new VideoScrubEngine();
     this.registerActiveVideo();
 
-    // 5. Setup Navigation & Scroll Listeners
+    // 6. Setup SPA Navigation & Scroll Listeners
     this.bindNavigation();
+    this.setupSpaRouter();
     this.setupScrollListener();
 
-    // 6. Check Kuchu Puchu Special effects (Rose petals + sweet rhyme)
+    // 7. Check Kuchu Puchu Special effects (Rose petals + sweet rhyme)
     this.checkKuchuSpecialEffects();
 
-    // 7. Initial badge update
+    // 8. Initial badge update
     this.ui.updateBadges();
 
-    console.log(`✨ MHS STORE [${this.currentPage.toUpperCase()}] loaded in Single-Animation Focus Mode.`);
+    console.log(`✨ MHS STORE [${this.currentPage.toUpperCase()}] Ultra-Fast SPA Engine Activated.`);
   }
 
-  // ================= ACTIVE SUBCATEGORY RESOLVER =================
-  initActiveSubCategory() {
+  // ================= URL / STATE RESOLVER =================
+  initFromUrl() {
+    const pathname = window.location.pathname.toLowerCase();
     const urlParams = new URLSearchParams(window.location.search);
     const subParam = urlParams.get('sub');
 
-    if (this.currentPage === 'men') {
+    if (pathname.includes('men')) {
+      this.currentPage = 'men';
       this.activeSubCategory = subParam || 'watches';
-    } else if (this.currentPage === 'women') {
+    } else if (pathname.includes('women')) {
+      this.currentPage = 'women';
       this.activeSubCategory = subParam || 'wedding';
-    } else if (this.currentPage === 'kids') {
+    } else if (pathname.includes('kids')) {
+      this.currentPage = 'kids';
       this.activeSubCategory = subParam || 'babyfootwear';
     } else {
-      this.activeSubCategory = 'title';
+      if (document.body.dataset.page && document.body.dataset.page !== 'home') {
+        this.currentPage = document.body.dataset.page;
+      } else {
+        this.currentPage = 'home';
+      }
+      this.activeSubCategory = subParam || (this.currentPage === 'men' ? 'watches' : this.currentPage === 'women' ? 'wedding' : this.currentPage === 'kids' ? 'babyfootwear' : 'title');
     }
+
+    document.body.dataset.page = this.currentPage;
+    this.updateHeaderActiveState();
+  }
+
+  // ================= INSTANT SPA ROUTER =================
+  setupSpaRouter() {
+    // Intercept Header Navigation Links for 0ms transitions
+    document.querySelectorAll('.dept-nav-btn, .brand-logo-wrap').forEach(link => {
+      link.addEventListener('click', (e) => {
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('http') || href.startsWith('#')) return;
+
+        e.preventDefault();
+        this.navigateSpa(href);
+      });
+    });
+
+    // Handle Browser Back / Forward buttons instantly
+    window.addEventListener('popstate', (e) => {
+      this.initFromUrl();
+      this.renderActiveSection();
+      this.renderSubnavTabs();
+      this.registerActiveVideo();
+      this.checkKuchuSpecialEffects();
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    });
+  }
+
+  navigateSpa(targetUrl) {
+    let targetPage = 'home';
+    let targetSub = null;
+
+    if (targetUrl.includes('men')) {
+      targetPage = 'men';
+      targetSub = 'watches';
+    } else if (targetUrl.includes('women')) {
+      targetPage = 'women';
+      targetSub = 'wedding';
+    } else if (targetUrl.includes('kids')) {
+      targetPage = 'kids';
+      targetSub = 'babyfootwear';
+    } else {
+      targetPage = 'home';
+      targetSub = 'title';
+    }
+
+    if (this.currentPage === targetPage && !targetUrl.includes('?sub=')) {
+      return; // Already on this page
+    }
+
+    this.currentPage = targetPage;
+    this.activeSubCategory = targetSub;
+    document.body.dataset.page = this.currentPage;
+
+    // Update Browser History and Title
+    const titles = {
+      home: 'MHS STORE — Luxury Universe',
+      men: "MHS STORE — Men's Sartorial Collection",
+      women: "MHS STORE — Women's Couture & Bridal",
+      kids: 'MHS STORE — Kids & Kuchu Puchu Wonderland'
+    };
+    document.title = titles[targetPage] || 'MHS STORE';
+    window.history.pushState({ page: targetPage, sub: targetSub }, '', targetUrl);
+
+    this.updateHeaderActiveState();
+    this.renderSubnavTabs();
+    this.renderActiveSection();
+    this.registerActiveVideo();
+    this.checkKuchuSpecialEffects();
+
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    this.ui.playAudio('swoosh');
+  }
+
+  updateHeaderActiveState() {
+    document.querySelectorAll('.header-dept-nav .dept-nav-btn').forEach(btn => {
+      const href = btn.getAttribute('href') || '';
+      const isHome = this.currentPage === 'home' && href.includes('index.html');
+      const isMen = this.currentPage === 'men' && href.includes('men.html');
+      const isWomen = this.currentPage === 'women' && href.includes('women.html');
+      const isKids = this.currentPage === 'kids' && href.includes('kids.html');
+
+      btn.classList.toggle('active', isHome || isMen || isWomen || isKids);
+    });
   }
 
   // ================= RENDER ACTIVE SECTION (ONLY 1 MOUNTS IN DOM) =================
@@ -104,6 +202,7 @@ class MhsApp {
               webkit-playsinline 
               muted 
               preload="auto"
+              src="${targetItem.videoSrc}"
             ></video>
           </div>
 
@@ -161,7 +260,12 @@ class MhsApp {
   // ================= RENDER SUBNAV TABS =================
   renderSubnavTabs() {
     const subnavDock = document.getElementById('subnav-dock');
-    if (!subnavDock || this.currentPage === 'home') return;
+    if (!subnavDock) return;
+
+    if (this.currentPage === 'home') {
+      subnavDock.innerHTML = '';
+      return;
+    }
 
     let items = [];
     if (this.currentPage === 'men') {
@@ -189,7 +293,7 @@ class MhsApp {
     });
   }
 
-  // ================= SWITCH SUBCATEGORY (ONLY THAT ANIMATION MOUNTS) =================
+  // ================= SWITCH SUBCATEGORY (ZERO DELAY INSTANT SWAP) =================
   switchSubCategory(subCategory) {
     this.activeSubCategory = subCategory;
 
@@ -200,17 +304,14 @@ class MhsApp {
       });
     }
 
-    if (this.videoEngine) {
-      this.videoEngine.destroy();
-      this.videoEngine = new VideoScrubEngine();
-    }
-
+    // Instant seamless DOM and Video update (no engine destruction)
     window.scrollTo({ top: 0, behavior: 'instant' });
     this.renderActiveSection();
     this.registerActiveVideo();
 
-    const newUrl = `${window.location.pathname}?sub=${subCategory}`;
-    window.history.replaceState({ sub: subCategory }, '', newUrl);
+    const pagePath = this.currentPage === 'home' ? 'index.html' : `${this.currentPage}.html`;
+    const newUrl = `${pagePath}?sub=${subCategory}`;
+    window.history.replaceState({ page: this.currentPage, sub: subCategory }, '', newUrl);
 
     // Trigger Kuchu Puchu Special effects (Rose petals + sweet rhyme)
     this.checkKuchuSpecialEffects();
