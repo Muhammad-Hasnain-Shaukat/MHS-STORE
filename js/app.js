@@ -1,6 +1,6 @@
 import { CATALOG, PRODUCTS } from './products.js';
 import { store } from './cart.js';
-import { VideoScrubEngine, VideoPool } from './video-engine.js';
+import { VideoScrubEngine } from './video-engine.js';
 import { UIController } from './ui.js';
 import { ProductDetailModal } from './product-detail.js';
 import { RosePetalsEngine } from './rose-petals.js';
@@ -28,19 +28,16 @@ class MhsApp {
     this.rosePetals = new RosePetalsEngine();
     this.kuchuMusic = new KuchuMusicBox();
 
-    // 1. Warm up global video pool in memory for instant 0ms switching
-    VideoPool.warmUp(CATALOG);
-
-    // 2. Determine initial page and subcategory
+    // 1. Determine initial page and subcategory
     this.initFromUrl();
 
-    // 3. Render ONLY the single active animation section
+    // 2. Render ONLY the single active animation section
     this.renderActiveSection();
 
-    // 4. Render Sub-Category Nav Tabs
+    // 3. Render Sub-Category Nav Tabs
     this.renderSubnavTabs();
 
-    // 5. Initialize Video Scrubbing Engine (singleton instance)
+    // 4. Initialize Video Scrubbing Engine (singleton instance)
     this.videoEngine = new VideoScrubEngine();
     this.registerActiveVideo();
 
@@ -189,7 +186,15 @@ class MhsApp {
       <section class="video-scrub-section" id="${targetItem.id}" data-section-id="${targetItem.id}" data-department="${targetItem.department}">
         <div class="video-sticky-viewport">
           <!-- Pristine Fullscreen Video Container -->
-          <div class="video-media-wrapper" id="active-video-wrapper">
+          <div class="video-media-wrapper">
+            <video 
+              class="scrub-video" 
+              playsinline 
+              webkit-playsinline 
+              muted 
+              preload="auto"
+              src="${targetItem.videoSrc}"
+            ></video>
             <div class="video-ambient-overlay"></div>
           </div>
 
@@ -231,13 +236,6 @@ class MhsApp {
         </div>
       </section>
     `;
-
-    // Mount the pre-warmed video directly from the VideoPool for instant 0ms playback
-    const wrapper = document.getElementById('active-video-wrapper');
-    if (wrapper) {
-      const videoEl = VideoPool.get(targetItem.videoSrc, targetItem.startOffset);
-      wrapper.insertBefore(videoEl, wrapper.firstChild);
-    }
   }
 
   registerActiveVideo() {

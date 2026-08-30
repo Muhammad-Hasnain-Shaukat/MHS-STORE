@@ -1,71 +1,5 @@
 // MHS STORE - High-Precision Video Scrubbing Engine (Continuous 60FPS Frame-by-Frame Interpolation)
 
-// Master In-Memory Video Pool for 0ms Instantaneous Switching
-export class VideoPool {
-  static pool = new Map();
-
-  static warmUp(catalog) {
-    if (!Array.isArray(catalog)) return;
-    
-    catalog.forEach(item => {
-      if (!item.videoSrc || this.pool.has(item.videoSrc)) return;
-
-      const vid = document.createElement('video');
-      vid.className = 'scrub-video';
-      vid.preload = 'auto';
-      vid.muted = true;
-      vid.playsInline = true;
-      vid.autoplay = false;
-      vid.setAttribute('playsinline', '');
-      vid.setAttribute('webkit-playsinline', '');
-      vid.setAttribute('muted', '');
-      vid.src = item.videoSrc;
-
-      const initialTime = Math.max(0.001, item.startOffset || 0);
-
-      const prime = () => {
-        try {
-          vid.currentTime = initialTime;
-        } catch (e) {}
-      };
-
-      vid.addEventListener('loadedmetadata', prime, { once: true });
-      vid.addEventListener('loadeddata', prime, { once: true });
-      vid.addEventListener('canplay', prime, { once: true });
-      vid.load();
-
-      this.pool.set(item.videoSrc, vid);
-    });
-  }
-
-  static get(videoSrc, startOffset = 0) {
-    let vid = this.pool.get(videoSrc);
-    if (!vid) {
-      vid = document.createElement('video');
-      vid.className = 'scrub-video';
-      vid.preload = 'auto';
-      vid.muted = true;
-      vid.playsInline = true;
-      vid.autoplay = false;
-      vid.setAttribute('playsinline', '');
-      vid.setAttribute('webkit-playsinline', '');
-      vid.setAttribute('muted', '');
-      vid.src = videoSrc;
-      vid.load();
-      this.pool.set(videoSrc, vid);
-    }
-
-    const initialTime = Math.max(0.001, startOffset);
-    try {
-      if (Math.abs(vid.currentTime - initialTime) > 0.05) {
-        vid.currentTime = initialTime;
-      }
-    } catch (e) {}
-
-    return vid;
-  }
-}
-
 export class VideoScrubEngine {
   constructor() {
     this.instances = new Map();
@@ -86,11 +20,12 @@ export class VideoScrubEngine {
 
     if (!video) return;
 
-    // Check if we already have an instance for this section
-    let instanceData = this.instances.get(sectionElement);
     const startOffset = (meta && meta.startOffset) || 0.0;
     const endOffset = (meta && meta.endOffset) || 0.0;
     const initialTime = Math.max(0.001, startOffset);
+
+    // Check if we already have an instance for this section
+    let instanceData = this.instances.get(sectionElement);
 
     if (!instanceData) {
       instanceData = {
@@ -112,12 +47,14 @@ export class VideoScrubEngine {
       };
       this.instances.set(sectionElement, instanceData);
     } else {
+      instanceData.video = video;
       instanceData.meta = meta;
       instanceData.startOffset = startOffset;
       instanceData.endOffset = endOffset;
       instanceData.targetTime = initialTime;
       instanceData.currentTime = initialTime;
       instanceData.pendingTime = null;
+      instanceData.duration = 10;
       instanceData.isLoaded = false;
       instanceData.currentTimelineItem = null;
       instanceData.targetProgress = 0;
@@ -134,7 +71,7 @@ export class VideoScrubEngine {
     video.setAttribute('webkit-playsinline', '');
     video.setAttribute('muted', '');
     
-    if (video.src !== meta.videoSrc && !video.src.endsWith(meta.videoSrc)) {
+    if (!video.src || (!video.src.endsWith(meta.videoSrc) && video.src !== meta.videoSrc)) {
       video.src = meta.videoSrc;
     }
     video.pause();
@@ -153,7 +90,6 @@ export class VideoScrubEngine {
 
     // Handle seeked event to ensure every intermediate frame is rendered seamlessly
     video.addEventListener('seeked', () => {
-      video.classList.add('video-ready');
       if (instanceData.pendingTime !== null) {
         const next = instanceData.pendingTime;
         instanceData.pendingTime = null;
@@ -177,12 +113,11 @@ export class VideoScrubEngine {
         video.currentTime = initialFrame;
       } catch (e) {}
 
-      video.classList.add('video-ready');
       this.updateDynamicTimelineItem(instanceData, 0);
       this.updateScroll();
     };
 
-    if (video.readyState >= 2) {
+    if (video.readyState >= 1) {
       onLoaded();
     } else {
       video.addEventListener('loadedmetadata', onLoaded, { once: true });
@@ -192,6 +127,13 @@ export class VideoScrubEngine {
     }
 
     video.load();
+
+    // Fallback: trigger frame 0 priming in case browser event fired before listener
+    setTimeout(() => {
+      if (!instanceData.isLoaded && video.readyState >= 1) {
+        onLoaded();
+      }
+    }, 100);
   }
 
   startLoop() {
