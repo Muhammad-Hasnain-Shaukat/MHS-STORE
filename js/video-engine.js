@@ -1,5 +1,4 @@
 // MHS STORE - High-Precision Video Scrubbing Engine (Continuous 60FPS Frame-by-Frame Interpolation)
-
 export class VideoScrubEngine {
   constructor() {
     this.instances = new Map();
@@ -20,49 +19,7 @@ export class VideoScrubEngine {
 
     if (!video) return;
 
-    const startOffset = (meta && meta.startOffset) || 0.0;
-    const endOffset = (meta && meta.endOffset) || 0.0;
-    const initialTime = Math.max(0.001, startOffset);
-
-    // Check if we already have an instance for this section
-    let instanceData = this.instances.get(sectionElement);
-
-    if (!instanceData) {
-      instanceData = {
-        section: sectionElement,
-        video: video,
-        progressBar: progressBar,
-        pill: pill,
-        meta: meta,
-        startOffset: startOffset,
-        endOffset: endOffset,
-        targetTime: initialTime,
-        currentTime: initialTime,
-        pendingTime: null,
-        duration: 10,
-        isLoaded: false,
-        currentTimelineItem: null,
-        targetProgress: 0,
-        currentProgress: 0
-      };
-      this.instances.set(sectionElement, instanceData);
-    } else {
-      instanceData.video = video;
-      instanceData.meta = meta;
-      instanceData.startOffset = startOffset;
-      instanceData.endOffset = endOffset;
-      instanceData.targetTime = initialTime;
-      instanceData.currentTime = initialTime;
-      instanceData.pendingTime = null;
-      instanceData.duration = 10;
-      instanceData.isLoaded = false;
-      instanceData.currentTimelineItem = null;
-      instanceData.targetProgress = 0;
-      instanceData.currentProgress = 0;
-      instanceData.progressBar = progressBar;
-      instanceData.pill = pill;
-    }
-
+    video.src = meta.videoSrc;
     video.muted = true;
     video.playsInline = true;
     video.autoplay = false;
@@ -70,11 +27,29 @@ export class VideoScrubEngine {
     video.setAttribute('playsinline', '');
     video.setAttribute('webkit-playsinline', '');
     video.setAttribute('muted', '');
-    
-    if (!video.src || (!video.src.endsWith(meta.videoSrc) && video.src !== meta.videoSrc)) {
-      video.src = meta.videoSrc;
-    }
     video.pause();
+
+    const startOffset = (meta && meta.startOffset) || 0.0;
+    const endOffset = (meta && meta.endOffset) || 0.0;
+    const initialTime = Math.max(0.001, startOffset);
+
+    const instanceData = {
+      section: sectionElement,
+      video: video,
+      progressBar: progressBar,
+      pill: pill,
+      meta: meta,
+      startOffset: startOffset,
+      endOffset: endOffset,
+      targetTime: initialTime,
+      currentTime: initialTime,
+      pendingTime: null,
+      duration: 10,
+      isLoaded: false,
+      currentTimelineItem: null,
+      targetProgress: 0,
+      currentProgress: 0
+    };
 
     // Mobile decoder unlock on first touch
     const primeMobile = () => {
@@ -88,13 +63,26 @@ export class VideoScrubEngine {
     };
     window.addEventListener('touchstart', primeMobile, { once: true, passive: true });
 
+    // Handle seeked event to ensure every intermediate frame is rendered seamlessly
+    video.addEventListener('seeked', () => {
+      if (instanceData.pendingTime !== null) {
+        const next = instanceData.pendingTime;
+        instanceData.pendingTime = null;
+        if (Math.abs(video.currentTime - next) > 0.005) {
+          try {
+            video.currentTime = next;
+          } catch (e) {}
+        }
+      }
+    });
+
     const onLoaded = () => {
       if (video.duration && !isNaN(video.duration) && video.duration > 0) {
         instanceData.duration = video.duration;
       }
       instanceData.isLoaded = true;
 
-      // Prime to initial frame immediately
+      // Prime to initial frame
       const initialFrame = Math.max(0.001, instanceData.startOffset);
       try {
         video.currentTime = initialFrame;
@@ -114,13 +102,7 @@ export class VideoScrubEngine {
     }
 
     video.load();
-
-    // Fallback: trigger frame 0 priming in case browser event fired before listener
-    setTimeout(() => {
-      if (!instanceData.isLoaded && video.readyState >= 1) {
-        onLoaded();
-      }
-    }, 100);
+    this.instances.set(sectionElement, instanceData);
   }
 
   startLoop() {
@@ -161,8 +143,6 @@ export class VideoScrubEngine {
 
   render() {
     for (const [sectionEl, data] of this.instances.entries()) {
-      if (!data.video) continue;
-
       if (!data.isLoaded) {
         if (data.video.readyState >= 1) {
           if (data.video.duration && !isNaN(data.video.duration) && data.video.duration > 0) {
@@ -174,33 +154,39 @@ export class VideoScrubEngine {
         }
       }
 
-      // Smooth Progress Bar Lerp
+      // Smooth Lerp Interpolation
+      const timeDiff = data.targetTime - data.currentTime;
       const progDiff = data.targetProgress - data.currentProgress;
-      if (Math.abs(progDiff) > 0.0001) {
+      const targetSafe = Math.max(0.001, Math.min(data.duration - 0.001, data.targetTime));
+
+      // Continuously interpolate until both currentTime and video.currentTime reach target
+      if (Math.abs(timeDiff) > this.epsilon || Math.abs(data.video.currentTime - targetSafe) > 0.01) {
+        if (Math.abs(timeDiff) > this.epsilon) {
+          data.currentTime += timeDiff * this.lerpFactor;
+        } else {
+          data.currentTime = data.targetTime;
+        }
+
+        // Apply precision frame timestamp to video
+        const safeTime = Math.max(0.001, Math.min(data.duration - 0.001, data.currentTime));
+        if (!data.video.seeking) {
+          try {
+            data.video.currentTime = safeTime;
+          } catch (e) {}
+        } else {
+          data.pendingTime = safeTime;
+        }
+      }
+
+      if (Math.abs(progDiff) > this.epsilon) {
         data.currentProgress += progDiff * this.lerpFactor;
       } else {
         data.currentProgress = data.targetProgress;
       }
 
+      // Update 3px Progress Line
       if (data.progressBar) {
         data.progressBar.style.transform = `scaleX(${data.currentProgress})`;
-      }
-
-      // Smooth Time Lerp
-      const timeDiff = data.targetTime - data.currentTime;
-      if (Math.abs(timeDiff) > this.epsilon) {
-        data.currentTime += timeDiff * this.lerpFactor;
-      } else {
-        data.currentTime = data.targetTime;
-      }
-
-      const safeTime = Math.max(0.001, Math.min(data.duration - 0.001, data.currentTime));
-
-      // Seek video frame smoothly
-      if (Math.abs(data.video.currentTime - safeTime) > 0.005) {
-        try {
-          data.video.currentTime = safeTime;
-        } catch (e) {}
       }
 
       // Real-Time Dynamic Timeline Item and Price Swapping
