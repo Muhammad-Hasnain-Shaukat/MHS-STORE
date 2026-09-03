@@ -162,7 +162,9 @@ export class VideoScrubEngine {
       // Calculate exact progress through the section
       const headerOffset = 48; // Unified 48px header
       const distanceScrolled = headerOffset - rect.top;
-      const rawProgress = distanceScrolled / scrollableDistance;
+      // Dwell buffer: reach 100% video frame at 90% scroll so final product rests comfortably in view before unsticking
+      const effectiveScrollDistance = Math.max(10, scrollableDistance * 0.90);
+      const rawProgress = distanceScrolled / effectiveScrollDistance;
       const progress = Math.max(0, Math.min(1, rawProgress));
 
       data.targetProgress = progress;
