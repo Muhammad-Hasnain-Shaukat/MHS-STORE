@@ -4,6 +4,24 @@
   "trailingSlash": false,
   "headers": [
     {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.(html)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, must-revalidate"
+        }
+      ]
+    },
+    {
       "source": "/(.*)\\.(mp4|webm|mp3|wav|ogg)",
       "headers": [
         {
@@ -34,9 +52,10 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=86400, stale-while-revalidate=604800"
+          "value": "no-cache, must-revalidate"
         }
       ]
     }
   ]
 }
+
