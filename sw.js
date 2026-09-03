@@ -1,5 +1,5 @@
 // MHS STORE - High-Speed Service Worker for Instant Edge Video Stream & Asset Caching
-const CACHE_NAME = 'mhs-store-edge-v2';
+const CACHE_NAME = 'mhs-store-edge-v3';
 
 const STATIC_ASSETS = [
   '/',
@@ -52,14 +52,16 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Video Streaming / Partial Content (Range Requests)
-  if (request.headers.has('range') || url.pathname.endsWith('.mp4')) {
-    event.respondWith(
-      fetch(request).catch(() => {
-        return caches.match(request);
-      })
-    );
-    return;
+  // Video Streaming & Audio (Bypass ServiceWorker completely so native browser HTTP 206 Partial Content Range streaming works flawlessly on Vercel)
+  if (
+    request.headers.has('range') ||
+    url.pathname.endsWith('.mp4') ||
+    url.pathname.endsWith('.webm') ||
+    url.pathname.endsWith('.mp3') ||
+    url.pathname.endsWith('.wav') ||
+    url.pathname.endsWith('.ogg')
+  ) {
+    return; // Pass through to browser native network stack
   }
 
   // Stale-While-Revalidate for Static Assets & Images

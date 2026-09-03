@@ -199,18 +199,22 @@ class MhsApp {
         <div class="video-sticky-viewport">
           <!-- Universal Master Video Slot Matrix for 0ms Instant Global Switching -->
           <div class="video-media-wrapper" id="video-media-wrapper">
-            ${CATALOG.map(item => `
+            ${CATALOG.map(item => {
+              const isActive = (item.id === targetItem.id);
+              return `
               <video 
-                class="scrub-video ${item.id === targetItem.id ? 'active-slot' : 'hidden-slot'}" 
+                class="scrub-video ${isActive ? 'active-slot' : 'hidden-slot'}" 
                 id="video-slot-${item.id}"
                 data-id="${item.id}"
+                data-src="${item.videoSrc}"
                 playsinline 
                 webkit-playsinline 
                 muted 
-                preload="auto"
-                src="${item.videoSrc}"
+                preload="${isActive ? 'auto' : 'none'}"
+                ${isActive ? `src="${item.videoSrc}"` : ''}
               ></video>
-            `).join('')}
+            `;
+            }).join('')}
             <div class="video-ambient-overlay"></div>
           </div>
 
@@ -255,11 +259,20 @@ class MhsApp {
     sectionEl.dataset.sectionId = targetItem.id;
     sectionEl.dataset.department = targetItem.department;
 
-    // 0ms Instant Slot Swap across all videos
+    // Instant Slot Swap across all videos with on-demand loading
     sectionEl.querySelectorAll('.scrub-video').forEach(vid => {
       const isActive = (vid.dataset.id === targetItem.id);
       vid.classList.toggle('active-slot', isActive);
       vid.classList.toggle('hidden-slot', !isActive);
+      if (isActive) {
+        if (!vid.src || (!vid.src.includes(encodeURI(vid.dataset.src)) && !vid.src.endsWith(vid.dataset.src))) {
+          vid.src = vid.dataset.src;
+          vid.preload = 'auto';
+          try { vid.load(); } catch (e) {}
+        }
+      } else {
+        try { vid.pause(); } catch (e) {}
+      }
     });
 
     // Cue Visibility
@@ -307,7 +320,30 @@ class MhsApp {
 
     if (targetItem && this.videoEngine) {
       const activeVideo = sectionEl.querySelector(`.scrub-video[data-id="${targetItem.id}"]`) || sectionEl.querySelector('.scrub-video.active-slot') || sectionEl.querySelector('.scrub-video');
+      if (activeVideo) {
+        if (!activeVideo.src || (!activeVideo.src.includes(encodeURI(targetItem.videoSrc)) && !activeVideo.src.endsWith(targetItem.videoSrc))) {
+          activeVideo.src = targetItem.videoSrc;
+          activeVideo.preload = 'auto';
+          try { activeVideo.load(); } catch (e) {}
+        }
+      }
       this.videoEngine.registerSection(sectionEl, targetItem, activeVideo);
+
+      // Pre-warm the next subcategory video in the same department during browser idle time
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(() => {
+          const deptVideos = CATALOG.filter(c => c.department === targetItem.department);
+          const currentIndex = deptVideos.findIndex(c => c.id === targetItem.id);
+          const nextItem = deptVideos[currentIndex + 1];
+          if (nextItem) {
+            const nextVid = sectionEl.querySelector(`.scrub-video[data-id="${nextItem.id}"]`);
+            if (nextVid && !nextVid.src) {
+              nextVid.src = nextItem.videoSrc;
+              nextVid.preload = 'metadata';
+            }
+          }
+        }, { timeout: 2000 });
+      }
     }
   }
 

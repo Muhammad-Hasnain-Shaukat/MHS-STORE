@@ -121,11 +121,6 @@ export class VideoScrubEngine {
       video.addEventListener('canplaythrough', onLoaded, { once: true });
     }
 
-    const initialFrame = Math.max(0.001, startOffset);
-    try {
-      video.currentTime = initialFrame;
-    } catch (e) {}
-
     this.updateDynamicTimelineItem(instanceData, 0);
     this.updateScroll();
   }
