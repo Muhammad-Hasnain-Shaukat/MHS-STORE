@@ -140,12 +140,12 @@ export const CATALOG = [
     navLabel: "Footwear",
     title: "Artisanal Handcrafted Shoes",
     videoSrc: "Male/male foot wear.mp4",
+    endOffset: 1.4,
     timelineItems: [
-      { start: 0.00, end: 0.20, id: "male-foot-01", title: "Venetian Burnished Oxford Shoes", price: 245, tag: "Italian Calfskin", image: "Male/male footwear details/oxford shoe.webp" },
-      { start: 0.20, end: 0.40, id: "male-foot-02", title: "Goodyear Welted Brogues", price: 280, tag: "Oak Bark Tanned Sole", image: "Male/male footwear details/goodyear welted brogue.webp" },
-      { start: 0.40, end: 0.60, id: "male-foot-04", title: "Monk Strap Calfskin Loafers", price: 235, tag: "Double Brass Buckle", image: "Male/male footwear details/monk strap calfskin.webp" },
-      { start: 0.60, end: 0.78, id: "male-foot-03", title: "Chelsea Boot in Oiled Nubuck", price: 265, tag: "Waterproof Leather", image: "Male/male footwear details/chelsea boot in oiled.webp" },
-      { start: 0.78, end: 1.00, id: "male-foot-05", title: "Minimalist Italian Leather Low-Tops", price: 185, tag: "Margom Rubber Outsole", image: "Male/male footwear details/minimalistic italian.webp" }
+      { start: 0.00, end: 0.25, id: "male-foot-01", title: "Venetian Burnished Oxford Shoes", price: 245, tag: "Italian Calfskin", image: "Male/male footwear details/oxford shoe.webp" },
+      { start: 0.25, end: 0.50, id: "male-foot-02", title: "Goodyear Welted Brogues", price: 280, tag: "Oak Bark Tanned Sole", image: "Male/male footwear details/goodyear welted brogue.webp" },
+      { start: 0.50, end: 0.75, id: "male-foot-04", title: "Monk Strap Calfskin Loafers", price: 235, tag: "Double Brass Buckle", image: "Male/male footwear details/monk strap calfskin.webp" },
+      { start: 0.75, end: 1.00, id: "male-foot-03", title: "Chelsea Boot in Oiled Nubuck", price: 265, tag: "Waterproof Leather", image: "Male/male footwear details/chelsea boot in oiled.webp" }
     ]
   },
   {
