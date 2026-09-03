@@ -97,6 +97,18 @@ export class VideoScrubEngine {
       }
     };
 
+    // Mobile iOS Safari / Chrome video decoder priming on first touch interaction
+    const unlockMobileVideo = () => {
+      if (video.paused) {
+        const p = video.play();
+        if (p && p.then) {
+          p.then(() => video.pause()).catch(() => {});
+        }
+      }
+      window.removeEventListener('touchstart', unlockMobileVideo);
+    };
+    window.addEventListener('touchstart', unlockMobileVideo, { once: true, passive: true });
+
     const onLoaded = () => {
       if (video.duration && !isNaN(video.duration) && video.duration > 0) {
         instanceData.duration = video.duration;
@@ -238,6 +250,11 @@ export class VideoScrubEngine {
 
     if (activeItem && activeItem !== data.currentTimelineItem) {
       data.currentTimelineItem = activeItem;
+
+      // Subtle mobile haptic feedback tick on product snap
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate(15); } catch (e) {}
+      }
 
       data.pill.classList.add('price-changing');
       setTimeout(() => data.pill.classList.remove('price-changing'), 250);

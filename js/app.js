@@ -243,8 +243,8 @@ class MhsApp {
           </div>
 
           <!-- Floating Interactive Plus Button & Expandable Product Pill -->
-          <div class="interactive-pill-container ${initialProduct ? '' : 'hidden-pill'}" id="interactive-pill-container">
-            <div class="minimal-add-bag-pill collapsed" id="dynamic-product-pill">
+          <div class="interactive-pill-container ${initialProduct ? 'expanded' : 'hidden-pill'}" id="interactive-pill-container">
+            <div class="minimal-add-bag-pill" id="dynamic-product-pill">
               <div class="pill-info" data-action="show-more" data-id="${initialProduct ? initialProduct.id : ''}" style="cursor:pointer;">
                 <span class="pill-tag">${initialProduct ? (initialProduct.tag || '') : ''}</span>
                 <span class="pill-title">${initialProduct ? initialProduct.title : ''}</span>
@@ -255,7 +255,7 @@ class MhsApp {
               </button>
             </div>
 
-            <button class="btn-pill-toggle" id="btn-pill-toggle" title="View Item Details" aria-label="Toggle Details">
+            <button class="btn-pill-toggle" id="btn-pill-toggle" title="Toggle Item Details" aria-label="Toggle Details">
               <i class="fas fa-plus icon-plus"></i>
               <i class="fas fa-times icon-close"></i>
             </button>
@@ -305,6 +305,10 @@ class MhsApp {
     if (pillContainer) {
       pillContainer.classList.toggle('hidden-pill', !hasProducts);
       if (hasProducts) {
+        pillContainer.classList.add('expanded');
+        const pill = pillContainer.querySelector('.minimal-add-bag-pill');
+        if (pill) pill.classList.remove('collapsed');
+
         const firstProd = targetItem.timelineItems[0];
         const tagEl = pillContainer.querySelector('.pill-tag');
         const titleEl = pillContainer.querySelector('.pill-title');
@@ -383,6 +387,14 @@ class MhsApp {
         this.switchSubCategory(selectedSub);
       };
     });
+
+    // Auto-scroll active chip into center on mobile
+    const activeChip = subnavDock.querySelector('.subnav-chip.active');
+    if (activeChip) {
+      setTimeout(() => {
+        try { activeChip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); } catch (e) {}
+      }, 60);
+    }
   }
 
   // ================= SWITCH SUBCATEGORY (0ms INSTANT SLOT SWAP) =================
@@ -392,7 +404,13 @@ class MhsApp {
     const subnavDock = document.getElementById('subnav-dock');
     if (subnavDock) {
       subnavDock.querySelectorAll('.subnav-chip').forEach(b => {
-        b.classList.toggle('active', b.dataset.subcategory === subCategory);
+        const isActive = (b.dataset.subcategory === subCategory);
+        b.classList.toggle('active', isActive);
+        if (isActive) {
+          try {
+            b.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          } catch (e) {}
+        }
       });
     }
 

@@ -99,6 +99,8 @@
   html {
     scroll-behavior: auto;
     background-color: #000000;
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
@@ -108,6 +110,7 @@
     padding: 0;
     background-color: #000000;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: none;
   }
 
   /* Force short nav text on mobile to prevent overflow */
@@ -124,6 +127,7 @@
   .site-header {
     height: var(--header-height);
     padding: 0 8px;
+    padding-top: env(safe-area-inset-top, 0px);
     width: 100%;
     box-sizing: border-box;
     overflow: hidden;
@@ -247,15 +251,16 @@
   }
 
   /* ------------------------------------------------------------------------
-     2. VIDEO POSITIONING: SHIFT HERO VIDEO RIGHT TO CENTER "MHS" SIGN
+     2. VIDEO POSITIONING & DYNAMIC TOUCH SCRUBBING
      ------------------------------------------------------------------------ */
   .video-scrub-section {
     position: relative;
-    height: 250vh; /* Smooth responsive scroll range on mobile */
+    height: 250vh; /* Optimal responsive scroll range on mobile */
     width: 100%;
     background-color: #000000;
     margin: 0;
     padding: 0;
+    touch-action: pan-y;
   }
 
   .video-sticky-viewport {
@@ -291,23 +296,18 @@
   }
 
   /* Hero Intro Video: Shift frame right so MHS illuminated sign & doors are DEAD-CENTER */
+  [data-section-id="hero-title"] .scrub-video,
+  #video-slot-hero-title,
   #hero-title .scrub-video {
     object-position: 70% center !important;
   }
 
   /* Department Categories Video Positioning (Centered focus) */
-  #male-watches .scrub-video { object-position: 50% center; }
-  #male-formal-wear .scrub-video { object-position: 50% center; }
-  #male-casual-wear .scrub-video { object-position: 50% center; }
-  #male-footwear .scrub-video { object-position: 50% center; }
-  #male-accessories .scrub-video { object-position: 50% center; }
-  #male-wed-wear .scrub-video { object-position: 50% center; }
-
-  #female-wed-wear .scrub-video { object-position: 50% center; }
-  #female-traditional-wear .scrub-video { object-position: 50% center; }
-  #female-jewellery .scrub-video { object-position: 50% center; }
-  #female-casual-wear .scrub-video { object-position: 50% center; }
-  #female-footwear .scrub-video { object-position: 50% center; }
+  [data-section-id*="male"] .scrub-video,
+  [data-section-id*="female"] .scrub-video,
+  [data-section-id*="kids"] .scrub-video {
+    object-position: 50% center;
+  }
 
   /* Minimal Scroll Cue */
   .minimal-scroll-cue {
@@ -381,10 +381,10 @@
      ------------------------------------------------------------------------ */
   .interactive-pill-container {
     position: absolute;
-    bottom: calc(42px + env(safe-area-inset-bottom, 0px));
-    left: 12px;
-    right: 12px;
-    width: calc(100% - 24px);
+    bottom: calc(38px + env(safe-area-inset-bottom, 0px));
+    left: 10px;
+    right: 10px;
+    width: calc(100% - 20px);
     max-width: 100%;
     display: flex;
     align-items: center;
@@ -395,9 +395,9 @@
   }
 
   .btn-pill-toggle {
-    width: 40px;
-    height: 40px;
-    font-size: 1rem;
+    width: 38px;
+    height: 38px;
+    font-size: 0.92rem;
     flex-shrink: 0;
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.85), 0 0 14px rgba(212, 175, 55, 0.45);
   }
@@ -406,18 +406,19 @@
     flex: 1;
     min-width: 0;
     max-width: calc(100% - 46px);
-    padding: 6px 8px 6px 10px;
-    gap: 6px;
-    background: rgba(10, 12, 18, 0.95);
-    border: 1px solid rgba(212, 175, 55, 0.4);
+    padding: 7px 10px 7px 12px;
+    gap: 8px;
+    background: rgba(10, 12, 18, 0.96);
+    border: 1px solid rgba(212, 175, 55, 0.45);
     border-radius: 100px;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85), 0 0 15px rgba(212, 175, 55, 0.2);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85), 0 0 15px rgba(212, 175, 55, 0.25);
     display: flex;
     align-items: center;
     justify-content: space-between;
     box-sizing: border-box;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .minimal-add-bag-pill.collapsed {
