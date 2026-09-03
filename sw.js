@@ -1,5 +1,5 @@
 // MHS STORE - High-Speed Service Worker for Instant Edge Video Stream & Asset Caching
-const CACHE_NAME = 'mhs-store-edge-v3';
+const CACHE_NAME = 'mhs-store-edge-v5';
 
 const STATIC_ASSETS = [
   '/',
@@ -25,12 +25,13 @@ const STATIC_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
         console.warn('SW: Non-critical asset cache skip', err);
       });
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -64,7 +65,23 @@ self.addEventListener('fetch', (event) => {
     return; // Pass through to browser native network stack
   }
 
-  // Stale-While-Revalidate for Static Assets & Images
+  // Network-First for JS, HTML & JSON to guarantee instant code and catalog updates
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.html') || url.pathname.endsWith('.json') || url.pathname === '/') {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseToCache));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Stale-While-Revalidate for Images & Static Assets
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       const fetchPromise = fetch(request).then((networkResponse) => {

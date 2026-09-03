@@ -28,9 +28,11 @@ class MhsApp {
     this.rosePetals = new RosePetalsEngine();
     this.kuchuMusic = new KuchuMusicBox();
 
-    // Register Service Worker for ultra-fast edge caching and video stream acceleration
+    // Register Service Worker for ultra-fast edge caching and instant updates
     if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        reg.update();
+      }).catch(() => {});
     }
 
     // 1. Determine initial page and subcategory
