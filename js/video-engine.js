@@ -5,8 +5,8 @@ export class VideoScrubEngine {
     this.rafId = null;
     this.isDestroyed = false;
 
-    // Smooth interpolation factor (0.35 for crisp, immediate 60fps continuous frame progression)
-    this.lerpFactor = 0.35;
+    // Snappy, silky interpolation factor (0.45 for immediate responsiveness)
+    this.lerpFactor = 0.45;
     this.epsilon = 0.0005;
 
     this.startLoop();
@@ -19,17 +19,20 @@ export class VideoScrubEngine {
 
     if (!video) return;
 
-    if (!video.src || (!video.src.endsWith(meta.videoSrc) && video.src !== meta.videoSrc)) {
-      video.src = meta.videoSrc;
+    const targetSrc = encodeURI(meta.videoSrc);
+    const cleanCurrent = decodeURI(video.currentSrc || video.src || '');
+    if (!cleanCurrent.endsWith(meta.videoSrc)) {
+      video.src = targetSrc;
+      video.preload = 'auto';
+      try { video.load(); } catch (e) {}
     }
     video.muted = true;
     video.playsInline = true;
     video.autoplay = false;
-    video.preload = 'auto';
     video.setAttribute('playsinline', '');
     video.setAttribute('webkit-playsinline', '');
     video.setAttribute('muted', '');
-    video.pause();
+    try { video.pause(); } catch (e) {}
 
     const startOffset = (meta && meta.startOffset) || 0.0;
     const endOffset = (meta && meta.endOffset) || 0.0;
@@ -48,6 +51,8 @@ export class VideoScrubEngine {
         targetTime: initialTime,
         currentTime: initialTime,
         pendingTime: null,
+        isSeeking: false,
+        lastSeekTime: 0,
         duration: (video.duration && video.duration > 0) ? video.duration : 10,
         isLoaded: video.readyState >= 1,
         currentTimelineItem: null,
@@ -63,6 +68,8 @@ export class VideoScrubEngine {
       instanceData.targetTime = initialTime;
       instanceData.currentTime = initialTime;
       instanceData.pendingTime = null;
+      instanceData.isSeeking = false;
+      instanceData.lastSeekTime = 0;
       instanceData.duration = (video.duration && video.duration > 0) ? video.duration : 10;
       instanceData.isLoaded = video.readyState >= 1;
       instanceData.currentTimelineItem = null;
@@ -72,30 +79,23 @@ export class VideoScrubEngine {
       instanceData.pill = pill;
     }
 
-    // Mobile decoder unlock on first touch
-    const primeMobile = () => {
-      if (video.paused) {
-        const p = video.play();
-        if (p && p.then) {
-          p.then(() => video.pause()).catch(() => {});
-        }
-      }
-      window.removeEventListener('touchstart', primeMobile);
-    };
-    window.addEventListener('touchstart', primeMobile, { once: true, passive: true });
-
-    // Handle seeked event to ensure every intermediate frame is rendered seamlessly
-    video.addEventListener('seeked', () => {
+    // High-performance seek completion handler
+    video.onseeked = () => {
+      instanceData.isSeeking = false;
       if (instanceData.pendingTime !== null) {
         const next = instanceData.pendingTime;
         instanceData.pendingTime = null;
-        if (Math.abs(video.currentTime - next) > 0.005) {
+        if (Math.abs(video.currentTime - next) > 0.008) {
+          instanceData.isSeeking = true;
+          instanceData.lastSeekTime = performance.now();
           try {
             video.currentTime = next;
-          } catch (e) {}
+          } catch (e) {
+            instanceData.isSeeking = false;
+          }
         }
       }
-    });
+    };
 
     const onLoaded = () => {
       if (video.duration && !isNaN(video.duration) && video.duration > 0) {
@@ -118,7 +118,6 @@ export class VideoScrubEngine {
       video.addEventListener('loadedmetadata', onLoaded, { once: true });
       video.addEventListener('loadeddata', onLoaded, { once: true });
       video.addEventListener('canplay', onLoaded, { once: true });
-      video.addEventListener('canplaythrough', onLoaded, { once: true });
     }
 
     this.updateDynamicTimelineItem(instanceData, 0);
@@ -144,6 +143,10 @@ export class VideoScrubEngine {
 
       if (scrollableDistance <= 0) continue;
 
+      if (data.video && data.video.duration && !isNaN(data.video.duration) && data.video.duration > 0) {
+        data.duration = data.video.duration;
+      }
+
       // Calculate exact progress through the section
       const headerOffset = 48; // Unified 48px header
       const distanceScrolled = headerOffset - rect.top;
@@ -163,6 +166,8 @@ export class VideoScrubEngine {
 
   render() {
     for (const [sectionEl, data] of this.instances.entries()) {
+      if (!data.video) continue;
+
       if (!data.isLoaded) {
         if (data.video.readyState >= 1) {
           if (data.video.duration && !isNaN(data.video.duration) && data.video.duration > 0) {
@@ -187,12 +192,20 @@ export class VideoScrubEngine {
           data.currentTime = data.targetTime;
         }
 
-        // Apply precision frame timestamp to video
         const safeTime = Math.max(0.001, Math.min(data.duration - 0.001, data.currentTime));
-        if (!data.video.seeking) {
+
+        // High-precision non-blocking seeking
+        const now = performance.now();
+        const isSeekingOverdue = data.isSeeking && (now - data.lastSeekTime > 50);
+
+        if (!data.isSeeking || isSeekingOverdue) {
+          data.isSeeking = true;
+          data.lastSeekTime = now;
           try {
             data.video.currentTime = safeTime;
-          } catch (e) {}
+          } catch (e) {
+            data.isSeeking = false;
+          }
         } else {
           data.pendingTime = safeTime;
         }
@@ -259,6 +272,7 @@ export class VideoScrubEngine {
     for (const [sectionEl, data] of this.instances.entries()) {
       if (data.video) {
         try {
+          data.video.onseeked = null;
           data.video.pause();
           data.video.removeAttribute('src');
           data.video.load();

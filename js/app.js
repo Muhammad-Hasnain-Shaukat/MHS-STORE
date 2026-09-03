@@ -109,6 +109,7 @@ class MhsApp {
       this.renderActiveSection();
       this.renderSubnavTabs();
       this.registerActiveVideo();
+      if (this.videoEngine) this.videoEngine.updateScroll();
       this.checkKuchuSpecialEffects();
       window.scrollTo({ top: 0, behavior: 'instant' });
     });
@@ -150,6 +151,7 @@ class MhsApp {
     this.renderSubnavTabs();
     this.renderActiveSection();
     this.registerActiveVideo();
+    if (this.videoEngine) this.videoEngine.updateScroll();
     this.checkKuchuSpecialEffects();
 
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -164,29 +166,45 @@ class MhsApp {
     });
   }
 
-  // ================= RENDER ACTIVE SECTION WITH UNIVERSAL MASTER VIDEO MATRIX =================
+  // ================= RENDER ACTIVE SECTION WITH DEPARTMENT MASTER VIDEO MATRIX =================
   renderActiveSection() {
     const container = document.getElementById('video-sections-container');
     if (!container) return;
 
     let targetItem = null;
+    let deptItems = [];
     if (this.currentPage === 'home') {
-      targetItem = CATALOG.find(c => c.department === 'Hero');
+      deptItems = CATALOG.filter(c => c.department === 'Hero');
+      targetItem = deptItems[0];
     } else if (this.currentPage === 'men') {
-      targetItem = CATALOG.find(c => c.department === 'Male' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Male');
+      deptItems = CATALOG.filter(c => c.department === 'Male');
+      targetItem = deptItems.find(c => c.subCategory === this.activeSubCategory) || deptItems[0];
     } else if (this.currentPage === 'women') {
-      targetItem = CATALOG.find(c => c.department === 'Female' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Female');
+      deptItems = CATALOG.filter(c => c.department === 'Female');
+      targetItem = deptItems.find(c => c.subCategory === this.activeSubCategory) || deptItems[0];
     } else if (this.currentPage === 'kids') {
-      targetItem = CATALOG.find(c => c.department === 'Kids' && c.subCategory === this.activeSubCategory) || CATALOG.find(c => c.department === 'Kids');
+      deptItems = CATALOG.filter(c => c.department === 'Kids');
+      targetItem = deptItems.find(c => c.subCategory === this.activeSubCategory) || deptItems[0];
     }
 
     if (!targetItem) return;
 
-    // Check if section already exists in DOM - if so, simply update slots in 0ms!
+    // Check if section already exists for this exact department - if so, simply update slot in 0ms!
     const sectionEl = container.querySelector('.video-scrub-section');
-    if (sectionEl) {
+    if (sectionEl && sectionEl.dataset.department === targetItem.department) {
       this.updateActiveSlotAndPill(targetItem);
       return;
+    }
+
+    // Clean up previous department videos to free GPU hardware decoders completely
+    if (sectionEl) {
+      sectionEl.querySelectorAll('.scrub-video').forEach(vid => {
+        try {
+          vid.pause();
+          vid.removeAttribute('src');
+          vid.load();
+        } catch (e) {}
+      });
     }
 
     // Only render Add to Bag pill on department category pages (not on homepage)
@@ -197,9 +215,9 @@ class MhsApp {
     container.innerHTML = `
       <section class="video-scrub-section" id="active-scrub-section" data-section-id="${targetItem.id}" data-department="${targetItem.department}">
         <div class="video-sticky-viewport">
-          <!-- Universal Master Video Slot Matrix for 0ms Instant Global Switching -->
+          <!-- Department Video Slots (All pre-buffered for instant 0ms category switching) -->
           <div class="video-media-wrapper" id="video-media-wrapper">
-            ${CATALOG.map(item => {
+            ${deptItems.map(item => {
               const isActive = (item.id === targetItem.id);
               return `
               <video 
@@ -210,8 +228,8 @@ class MhsApp {
                 playsinline 
                 webkit-playsinline 
                 muted 
-                preload="${isActive ? 'auto' : 'none'}"
-                ${isActive ? `src="${item.videoSrc}"` : ''}
+                preload="auto"
+                src="${encodeURI(item.videoSrc)}"
               ></video>
             `;
             }).join('')}
@@ -259,14 +277,14 @@ class MhsApp {
     sectionEl.dataset.sectionId = targetItem.id;
     sectionEl.dataset.department = targetItem.department;
 
-    // Instant Slot Swap across all videos with on-demand loading
+    // Instant Slot Swap across all videos in this department
     sectionEl.querySelectorAll('.scrub-video').forEach(vid => {
       const isActive = (vid.dataset.id === targetItem.id);
       vid.classList.toggle('active-slot', isActive);
       vid.classList.toggle('hidden-slot', !isActive);
       if (isActive) {
-        if (!vid.src || (!vid.src.includes(encodeURI(vid.dataset.src)) && !vid.src.endsWith(vid.dataset.src))) {
-          vid.src = vid.dataset.src;
+        if (!vid.src || !decodeURI(vid.src).endsWith(vid.dataset.src)) {
+          vid.src = encodeURI(vid.dataset.src);
           vid.preload = 'auto';
           try { vid.load(); } catch (e) {}
         }
@@ -321,29 +339,13 @@ class MhsApp {
     if (targetItem && this.videoEngine) {
       const activeVideo = sectionEl.querySelector(`.scrub-video[data-id="${targetItem.id}"]`) || sectionEl.querySelector('.scrub-video.active-slot') || sectionEl.querySelector('.scrub-video');
       if (activeVideo) {
-        if (!activeVideo.src || (!activeVideo.src.includes(encodeURI(targetItem.videoSrc)) && !activeVideo.src.endsWith(targetItem.videoSrc))) {
-          activeVideo.src = targetItem.videoSrc;
+        if (!activeVideo.src || !decodeURI(activeVideo.src).endsWith(targetItem.videoSrc)) {
+          activeVideo.src = encodeURI(targetItem.videoSrc);
           activeVideo.preload = 'auto';
           try { activeVideo.load(); } catch (e) {}
         }
       }
       this.videoEngine.registerSection(sectionEl, targetItem, activeVideo);
-
-      // Pre-warm the next subcategory video in the same department during browser idle time
-      if ('requestIdleCallback' in window) {
-        window.requestIdleCallback(() => {
-          const deptVideos = CATALOG.filter(c => c.department === targetItem.department);
-          const currentIndex = deptVideos.findIndex(c => c.id === targetItem.id);
-          const nextItem = deptVideos[currentIndex + 1];
-          if (nextItem) {
-            const nextVid = sectionEl.querySelector(`.scrub-video[data-id="${nextItem.id}"]`);
-            if (nextVid && !nextVid.src) {
-              nextVid.src = nextItem.videoSrc;
-              nextVid.preload = 'metadata';
-            }
-          }
-        }, { timeout: 2000 });
-      }
     }
   }
 
@@ -406,6 +408,9 @@ class MhsApp {
     this.updateActiveSlotAndPill(targetItem);
     window.scrollTo({ top: 0, behavior: 'instant' });
     this.registerActiveVideo();
+    if (this.videoEngine) {
+      this.videoEngine.updateScroll();
+    }
 
     const pagePath = this.currentPage === 'home' ? 'index.html' : `${this.currentPage}.html`;
     const newUrl = `${pagePath}?sub=${subCategory}`;
